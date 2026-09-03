@@ -1,0 +1,269 @@
+{
+  "workers": [
+    {
+      "id": "admin-default",
+      "email": "admin@sasorilabs.io",
+      "name": "Administrador Sasorilabs",
+      "role": "admin",
+      "permissions": [
+        "register_users",
+        "view_all",
+        "send_push",
+        "manage_workers",
+        "export_data",
+        "delete_records"
+      ],
+      "active": true,
+      "createdAt": "2026-09-03T06:47:31.613Z"
+    },
+    {
+      "id": "worker-demo",
+      "email": "worker@sasorilabs.io",
+      "name": "Juan Trabajador",
+      "role": "worker",
+      "permissions": [
+        "register_users",
+        "view_all",
+        "send_push",
+        "export_data"
+      ],
+      "active": true,
+      "createdAt": "2026-09-03T06:47:31.613Z"
+    }
+  ],
+  "members": [
+    {
+      "id": "member-1",
+      "dniPassport": "12345678Z",
+      "documentType": "DNI",
+      "firstName": "CARLOS",
+      "lastName": "SANCHEZ GOMEZ",
+      "nationality": "ESPAÑOLA",
+      "birthDate": "1990-08-15",
+      "expiryDate": "2030-11-24",
+      "email": "carlos.sanchez@email.com",
+      "phone": "+34 612 345 678",
+      "address": "Calle de Alcalá, 45, Madrid, España",
+      "gender": "MASCULINO",
+      "registrationStatus": "approved",
+      "registerDate": "2026-06-12T10:30:00.000Z",
+      "registeredBy": {
+        "id": "admin-default",
+        "name": "Administrador Sasorilabs"
+      }
+    },
+    {
+      "id": "member-2",
+      "dniPassport": "EM9876543",
+      "documentType": "PASSPORT",
+      "firstName": "MARIE",
+      "lastName": "DUBOIS",
+      "nationality": "FRENCH",
+      "birthDate": "1995-04-12",
+      "expiryDate": "2032-09-30",
+      "email": "marie.dubois@email.com",
+      "phone": "+33 6 1234 5678",
+      "address": "Rue de Rivoli, 75, París, Francia",
+      "gender": "FEMENINO",
+      "registrationStatus": "pending",
+      "registerDate": "2026-07-09T14:15:00.000Z",
+      "registeredBy": {
+        "id": "worker-demo",
+        "name": "Juan Trabajador"
+      }
+    }
+  ],
+  "notifications": [
+    {
+      "id": "notif-tlq783w",
+      "title": "Prueba",
+      "message": "Despiertate",
+      "timestamp": "2026-09-03T07:17:58.087Z",
+      "senderName": "Administrador Sasorilabs",
+      "senderRole": "admin",
+      "isPush": true
+    },
+    {
+      "id": "notif-1",
+      "title": "Bienvenido al Sistema",
+      "message": "Se ha iniciado la plataforma de administración Sasorilabs.io correctamente.",
+      "timestamp": "2026-09-03T06:47:31.613Z",
+      "senderName": "Sistema",
+      "senderRole": "admin",
+      "isPush": true
+    }
+  ],
+  "activityLogs": [
+    {
+      "id": "log-1d5r5yo",
+      "timestamp": "2026-09-03T08:40:27.182Z",
+      "workerName": "Armando-Programador Prueba",
+      "workerRole": "worker",
+      "action": "ESCÁNER DOCUMENTAL",
+      "details": "Iniciando análisis de documento por procesador óptico OCR (Preset: Imagen propia)",
+      "changes": []
+    },
+    {
+      "id": "log-ey9btvj",
+      "timestamp": "2026-09-03T08:40:06.822Z",
+      "workerName": "Armando-Programador Prueba",
+      "workerRole": "worker",
+      "action": "ESCÁNER DOCUMENTAL",
+      "details": "Iniciando análisis de documento por procesador óptico OCR (Preset: Imagen propia)",
+      "changes": []
+    },
+    {
+      "id": "log-audit-mem1-3",
+      "timestamp": "2026-08-10T11:20:00.000Z",
+      "workerName": "Juan Trabajador",
+      "workerRole": "worker",
+      "action": "EDICIÓN DE CONTACTO",
+      "details": "Actualizado teléfono y dirección del socio",
+      "memberId": "member-1",
+      "memberName": "CARLOS SANCHEZ GOMEZ",
+      "changes": [
+        {
+          "field": "phone",
+          "label": "Teléfono",
+          "from": "+34 600 112 233",
+          "to": "+34 612 345 678"
+        },
+        {
+          "field": "address",
+          "label": "Dirección",
+          "from": "Calle Gran Vía, 12, Madrid",
+          "to": "Calle de Alcalá, 45, Madrid, España"
+        }
+      ]
+    },
+    {
+      "id": "log-audit-mem1-2",
+      "timestamp": "2026-06-12T11:00:00.000Z",
+      "workerName": "Administrador Sasorilabs",
+      "workerRole": "admin",
+      "action": "APROBACIÓN DE EXPEDIENTE",
+      "details": "Aprobada solicitud de membresía tras validación documental",
+      "memberId": "member-1",
+      "memberName": "CARLOS SANCHEZ GOMEZ",
+      "changes": [
+        {
+          "field": "registrationStatus",
+          "label": "Estado Membresía",
+          "from": "pending",
+          "to": "approved"
+        }
+      ]
+    },
+    {
+      "id": "log-audit-mem1-1",
+      "timestamp": "2026-06-12T10:30:00.000Z",
+      "workerName": "Administrador Sasorilabs",
+      "workerRole": "admin",
+      "action": "ALTA DE SOCIO",
+      "details": "Registro inicial de socio CARLOS SANCHEZ GOMEZ (12345678Z) mediante DNI presencial",
+      "memberId": "member-1",
+      "memberName": "CARLOS SANCHEZ GOMEZ",
+      "changes": [
+        {
+          "field": "dniPassport",
+          "label": "N° Documento",
+          "from": "Ninguno",
+          "to": "12345678Z"
+        },
+        {
+          "field": "registrationStatus",
+          "label": "Estado",
+          "from": "Sin registro",
+          "to": "approved"
+        }
+      ]
+    },
+    {
+      "id": "log-audit-mem2-2",
+      "timestamp": "2026-07-09T14:25:00.000Z",
+      "workerName": "Juan Trabajador",
+      "workerRole": "worker",
+      "action": "VALIDACIÓN OCR",
+      "details": "Escaneo de Pasaporte Francés procesado y verificado por IA OCR",
+      "memberId": "member-2",
+      "memberName": "MARIE DUBOIS",
+      "changes": [
+        {
+          "field": "documentType",
+          "label": "Tipo Documento",
+          "from": "Desconocido",
+          "to": "PASSPORT"
+        },
+        {
+          "field": "nationality",
+          "label": "Nacionalidad",
+          "from": "N/D",
+          "to": "FRENCH"
+        }
+      ]
+    },
+    {
+      "id": "log-audit-mem2-1",
+      "timestamp": "2026-07-09T14:15:00.000Z",
+      "workerName": "Juan Trabajador",
+      "workerRole": "worker",
+      "action": "ALTA DE SOCIO",
+      "details": "Registro de solicitud pendiente para MARIE DUBOIS (EM9876543)",
+      "memberId": "member-2",
+      "memberName": "MARIE DUBOIS",
+      "changes": [
+        {
+          "field": "registrationStatus",
+          "label": "Estado",
+          "from": "Sin registro",
+          "to": "pending"
+        }
+      ]
+    },
+    {
+      "id": "log-itzm5x5",
+      "timestamp": "2026-09-03T07:21:12.095Z",
+      "workerName": "Juan Trabajador",
+      "workerRole": "worker",
+      "action": "ACCESO",
+      "details": "Inicio de sesión correcto en el panel."
+    },
+    {
+      "id": "log-y8epss5",
+      "timestamp": "2026-09-03T07:17:58.087Z",
+      "workerName": "Administrador Sasorilabs",
+      "workerRole": "admin",
+      "action": "NOTIFICACIÓN PUSH",
+      "details": "Enviado mensaje en tiempo real: \"Prueba\""
+    },
+    {
+      "id": "log-vvonl4v",
+      "timestamp": "2026-09-03T07:16:54.343Z",
+      "workerName": "Administrador Sasorilabs",
+      "workerRole": "admin",
+      "action": "ACCESO",
+      "details": "Inicio de sesión correcto en el panel."
+    },
+    {
+      "id": "log-uj2vio2",
+      "timestamp": "2026-09-03T07:03:11.058Z",
+      "workerName": "Juan Trabajador",
+      "workerRole": "worker",
+      "action": "ACCESO",
+      "details": "Inicio de sesión correcto en el panel."
+    },
+    {
+      "id": "log-1",
+      "timestamp": "2026-09-03T06:47:31.613Z",
+      "workerName": "Sistema",
+      "workerRole": "admin",
+      "action": "INICIALIZACIÓN",
+      "details": "Sistema de gestión para Sasorilabs.io iniciado con datos demo."
+    }
+  ],
+  "supabaseConfig": {
+    "supabaseUrl": "",
+    "supabaseAnonKey": "",
+    "isConnected": false
+  }
+}

@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-brand-red: #10b981;
+  --color-brand-red-hover: #059669;
+  --color-brand-dark: #080d0a;
+  --color-panel-dark: #0e1711;
+  --color-border-dark: #1a2a1e;
+  --color-cannabis-leaf: #22c55e;
+  --color-cannabis-dark: #064e3b;
+  --color-cannabis-accent: #34d399;
+}
+
+/* Base custom styles for Laguna Verde Elite Admin */
+body {
+  background-color: var(--color-brand-dark);
+  color: #f3f4f6;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Glassmorphism high-end panel */
+.glass-panel {
+  background: rgba(14, 23, 17, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(16, 185, 129, 0.08);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(14, 23, 17, 0.9);
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 8px 32px 0 rgba(16, 185, 129, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Glowing text and borders */
+.glow-border {
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+}
+
+.glow-text-red {
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.45);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #080d0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1a2a1e;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #10b981;
+}
+
+/* Print utility for PDF / Document reports */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .glass-panel {
+    border: 1px solid #ccc !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: black !important;
+  }
+}
