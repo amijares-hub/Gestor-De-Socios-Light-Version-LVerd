@@ -7,7 +7,12 @@ import {
   Trash2, 
   AlertCircle,
   CheckCircle,
-  Download
+  Download,
+  ChevronDown,
+  ChevronUp,
+  Menu,
+  IdCard,
+  Shield
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -76,6 +81,8 @@ export default function App() {
   });
 
   const [activeTab, setActiveTab] = useState<string>('members');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+
   const [members, setMembers] = useState<AssociationMember[]>([]);
   const [workers, setWorkers] = useState<WorkerUser[]>([]);
   const [notifications, setNotifications] = useState<RealTimeNotification[]>([]);
@@ -116,6 +123,10 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastRegisteredMember, setLastRegisteredMember] = useState<AssociationMember | null>(null);
 
+  useEffect(() => {
+    document.title = `${appName} - Panel Oficial`;
+  }, [appName]);
+
   const fetchAppSettings = async () => {
     try {
       const { data, error } = await supabase
@@ -136,10 +147,6 @@ export default function App() {
   useEffect(() => {
     fetchAppSettings();
   }, []);
-
-  useEffect(() => {
-    document.title = `${appName} - Panel Oficial`;
-  }, [appName]);
 
   const handleUpdateAppSettings = async (newName: string, newLogo: string | null) => {
     const { error } = await supabase
@@ -596,62 +603,130 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-dark flex flex-col relative text-gray-200">
-      <header className="h-16 border-b border-border-dark bg-panel-dark/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-40">
+      
+      {/* Header Superior Admin */}
+      <header className="h-16 border-b border-border-dark bg-panel-dark/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-black text-white text-xs overflow-hidden shadow">
+          <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-black text-white text-xs overflow-hidden shadow shrink-0">
             {appLogo ? <img src={appLogo} alt="Logo" className="w-full h-full object-cover" /> : appName.slice(0, 2)}
           </div>
           <div>
-            <h1 className="text-sm font-black text-white uppercase">{appName}</h1>
+            <h1 className="text-xs sm:text-sm font-black text-white uppercase truncate max-w-[130px] sm:max-w-none">{appName}</h1>
             <p className="text-[9px] font-mono text-gray-500 font-bold">ADMIN PANEL</p>
           </div>
         </div>
 
+        {/* Píldoras de Navegación Escritorio (>= lg) */}
         <nav className="hidden lg:flex items-center gap-1 bg-brand-dark p-1 border border-border-dark rounded-xl text-xs font-semibold">
           <button 
             onClick={() => setActiveTab('members')}
-            className={`px-4 py-1.5 rounded-lg ${activeTab === 'members' ? 'bg-panel-dark text-white' : 'text-gray-400'}`}
+            className={`px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${activeTab === 'members' ? 'bg-panel-dark text-white shadow' : 'text-gray-400 hover:text-white'}`}
           >
             <Users size={13} /> Socios ({members.length})
           </button>
           <button 
             onClick={() => setActiveTab('register')}
-            className={`px-4 py-1.5 rounded-lg ${activeTab === 'register' ? 'bg-panel-dark text-white' : 'text-gray-400'}`}
+            className={`px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${activeTab === 'register' ? 'bg-panel-dark text-white shadow' : 'text-gray-400 hover:text-white'}`}
           >
             <UserPlus size={13} /> Alta Socio
           </button>
           <button 
             onClick={() => setActiveTab('workers')}
-            className={`px-4 py-1.5 rounded-lg ${activeTab === 'workers' ? 'bg-panel-dark text-white' : 'text-gray-400'}`}
+            className={`px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${activeTab === 'workers' ? 'bg-panel-dark text-white shadow' : 'text-gray-400 hover:text-white'}`}
           >
             <ShieldAlert size={13} /> Personal & Auditoría
           </button>
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="text-right">
-            <p className="text-xs font-bold text-white leading-none">{workerSession.name}</p>
-            <p className="text-[10px] font-mono text-gray-500 uppercase">{workerSession.role}</p>
+            <p className="text-xs font-bold text-white leading-none truncate max-w-[100px] sm:max-w-none">{workerSession.name}</p>
+            <p className="text-[9px] font-mono text-gray-500 uppercase">{workerSession.role}</p>
           </div>
-          <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-brand-red">
+          <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-brand-red transition-colors" title="Cerrar Sesión">
             <LogOut size={16} />
           </button>
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+      {/* MENÚ ACORDEÓN / PÍLDORA EXCLUSIVO MÓVIL Y TABLET (< lg) */}
+      <div className="lg:hidden bg-panel-dark border-b border-border-dark px-3 py-2.5">
+        <div className="p-1 bg-brand-dark rounded-2xl border border-border-dark">
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-white uppercase tracking-wider"
+          >
+            <div className="flex items-center gap-2">
+              <Menu size={15} className="text-emerald-400" />
+              <span>
+                {activeTab === 'members' && `Socios (${members.length})`}
+                {activeTab === 'register' && 'Alta Socio'}
+                {activeTab === 'workers' && 'Personal & Auditoría'}
+              </span>
+            </div>
+            {isMobileMenuOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+          </button>
+
+          {/* Opciones del Acordeón Móvil (Exactas al diseño de la imagen) */}
+          {isMobileMenuOpen && (
+            <div className="pt-2 border-t border-border-dark/60 grid grid-cols-3 gap-1.5 p-1 animate-in slide-in-from-top-2 duration-150">
+              <button
+                type="button"
+                onClick={() => { setActiveTab('members'); setIsMobileMenuOpen(false); }}
+                className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
+                  activeTab === 'members'
+                    ? 'bg-panel-dark text-white font-bold border border-border-dark shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Users size={18} className="mb-1 text-emerald-400" />
+                <span className="text-[10px] font-bold">Socios ({members.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setActiveTab('register'); setIsMobileMenuOpen(false); }}
+                className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
+                  activeTab === 'register'
+                    ? 'bg-panel-dark text-white font-bold border border-border-dark shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <UserPlus size={18} className="mb-1 text-brand-red" />
+                <span className="text-[10px] font-bold">Alta Socio</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setActiveTab('workers'); setIsMobileMenuOpen(false); }}
+                className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
+                  activeTab === 'workers'
+                    ? 'bg-panel-dark text-white font-bold border border-border-dark shadow-md'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Shield size={18} className="mb-1 text-amber-400" />
+                <span className="text-[10px] font-bold">Personal & Audit.</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 md:p-6 space-y-6">
         {activeTab === 'members' && (
           <div className="space-y-6">
             <DashboardStats members={members} />
 
-            <div className="bg-panel-dark border border-border-dark rounded-3xl p-6 space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-white uppercase">Directorio de Miembros ({members.length})</h2>
+            <div className="bg-panel-dark border border-border-dark rounded-3xl p-4 sm:p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <h2 className="text-base sm:text-xl font-bold text-white uppercase">Directorio de Miembros ({members.length})</h2>
                 <button 
                   onClick={() => setActiveTab('register')}
-                  className="px-4 py-2 bg-brand-red text-white rounded-xl text-xs font-bold uppercase"
+                  className="px-4 py-2 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-1.5 shadow"
                 >
-                  <UserPlus size={14} /> Registrar Socio Nuevo
+                  <UserPlus size={14} /> Registrar Socio
                 </button>
               </div>
 
@@ -665,21 +740,21 @@ export default function App() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {filteredMembers.map(member => (
-                  <div key={member.id} className="bg-brand-dark border border-border-dark rounded-2xl p-4 flex justify-between items-center">
-                    <div>
+                  <div key={member.id} className="bg-brand-dark border border-border-dark rounded-2xl p-3.5 sm:p-4 flex justify-between items-center">
+                    <div className="min-w-0 pr-2">
                       <span className="text-[10px] font-mono text-gray-500 font-bold uppercase">
                         {member.documentType}: {formatMaskedDni(member.dniPassport, !!revealedDniIds[member.id])}
                       </span>
-                      <h4 className="text-sm font-bold text-white">{member.lastName}, {member.firstName}</h4>
-                      <p className="text-[11px] text-gray-400 mt-0.5">{member.email || 'Sin correo'}</p>
+                      <h4 className="text-xs sm:text-sm font-bold text-white truncate">{member.lastName}, {member.firstName}</h4>
+                      <p className="text-[10px] text-gray-400 mt-0.5 truncate">{member.email || 'Sin correo'}</p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button 
                         onClick={() => setSelectedMember(member)}
-                        className="px-3 py-1 bg-gray-900 border border-border-dark text-xs font-bold text-gray-300 rounded-lg"
+                        className="px-2.5 py-1.5 bg-gray-900 border border-border-dark text-xs font-bold text-gray-300 rounded-lg hover:text-white"
                       >
                         Ficha
                       </button>
@@ -697,9 +772,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ALTA OFICIAL DE SOCIO EN VISTA ADMIN */}
+        {/* ALTA SOCIO ADMIN */}
         {activeTab === 'register' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
             
             <div className="lg:col-span-5 space-y-4">
               <DniPhotoCapture
@@ -711,19 +786,16 @@ export default function App() {
             </div>
 
             <div className="lg:col-span-7">
-              <div className="bg-panel-dark border border-border-dark rounded-2xl p-5 md:p-6 shadow-xl space-y-5">
+              <div className="bg-panel-dark border border-border-dark rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
                 <div className="flex items-center justify-between border-b border-border-dark pb-3">
                   <div>
-                    <h3 className="text-base font-display font-bold text-white uppercase tracking-wider">
+                    <h3 className="text-sm sm:text-base font-display font-bold text-white uppercase tracking-wider">
                       Alta Oficial de Socio — {appName}
                     </h3>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      Ingresa los datos personales y documentales del nuevo socio.
+                      Ingresa los datos personales del nuevo socio.
                     </p>
                   </div>
-                  <span className="text-[10px] font-mono text-gray-400 bg-brand-dark px-2.5 py-1 rounded-lg border border-border-dark">
-                    Agente: {workerSession.name.split(' ')[0]}
-                  </span>
                 </div>
 
                 {formError && (
@@ -748,16 +820,16 @@ export default function App() {
                         }}
                         className="w-full py-2.5 bg-brand-red hover:bg-brand-red-hover text-white font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all"
                       >
-                        <Download size={14} /> Imprimir Ficha de Alta para Firma (PDF B&W)
+                        <Download size={14} /> Imprimir Ficha de Alta PDF
                       </button>
                     )}
                   </div>
                 )}
 
                 <form onSubmit={handleRegisterMember} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase mb-1.5">
                         Tipo Documento *
                       </label>
                       <select
@@ -770,8 +842,8 @@ export default function App() {
                       </select>
                     </div>
 
-                    <div className="md:col-span-2">
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase mb-1.5">
                         Número de Documento *
                       </label>
                       <input
@@ -779,15 +851,15 @@ export default function App() {
                         required
                         value={formDniPassport}
                         onChange={(e) => setFormDniPassport(e.target.value.toUpperCase())}
-                        placeholder="Ej: 12345678Z o AA123456"
+                        placeholder="Ej: 12345678Z"
                         className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs font-mono font-bold text-white uppercase focus:outline-none focus:border-brand-red"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase mb-1.5">
                         Nombre(s) *
                       </label>
                       <input
@@ -795,13 +867,12 @@ export default function App() {
                         required
                         value={formFirstName}
                         onChange={(e) => setFormFirstName(e.target.value)}
-                        placeholder="Ej: MARÍA"
-                        className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white uppercase focus:outline-none focus:border-brand-red font-medium"
+                        className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white uppercase focus:outline-none focus:border-brand-red"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase mb-1.5">
                         Apellidos *
                       </label>
                       <input
@@ -809,28 +880,26 @@ export default function App() {
                         required
                         value={formLastName}
                         onChange={(e) => setFormLastName(e.target.value)}
-                        placeholder="Ej: GARCÍA LÓPEZ"
-                        className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white uppercase focus:outline-none focus:border-brand-red font-medium"
+                        className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white uppercase focus:outline-none focus:border-brand-red"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase mb-1.5">
                         Nacionalidad
                       </label>
                       <input
                         type="text"
                         value={formNationality}
                         onChange={(e) => setFormNationality(e.target.value)}
-                        placeholder="ESPAÑOLA"
-                        className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white uppercase focus:outline-none focus:border-brand-red font-medium"
+                        className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white uppercase focus:outline-none focus:border-brand-red"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase mb-1.5">
                         Fecha Nacimiento
                       </label>
                       <input
@@ -842,7 +911,7 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase mb-1.5">
                         Validez Documento
                       </label>
                       <input
@@ -854,61 +923,58 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase mb-1.5">
                         Correo Electrónico
                       </label>
                       <input
                         type="email"
                         value={formEmail}
                         onChange={(e) => setFormEmail(e.target.value)}
-                        placeholder="socio@ejemplo.com"
-                        className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white focus:outline-none focus:border-brand-red font-medium"
+                        className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white focus:outline-none focus:border-brand-red"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase mb-1.5">
                         Teléfono
                       </label>
                       <input
                         type="tel"
                         value={formPhone}
                         onChange={(e) => setFormPhone(e.target.value)}
-                        placeholder="+34 600 000 000"
-                        className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white focus:outline-none focus:border-brand-red font-medium"
+                        className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white focus:outline-none focus:border-brand-red"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">
-                      Dirección de Residencia
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase mb-1.5">
+                      Dirección
                     </label>
                     <input
                       type="text"
                       value={formAddress}
                       onChange={(e) => setFormAddress(e.target.value)}
-                      placeholder="Calle, Número, Piso, Ciudad"
-                      className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white focus:outline-none focus:border-brand-red font-medium"
+                      className="w-full h-10 px-3 bg-brand-dark border border-border-dark rounded-xl text-xs text-white focus:outline-none focus:border-brand-red"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full h-12 bg-brand-red hover:bg-brand-red-hover disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mt-2"
+                    className="w-full h-12 bg-brand-red hover:bg-brand-red-hover text-white font-bold text-xs uppercase rounded-xl shadow-lg transition-all"
                   >
-                    {isSubmitting ? 'Registrando Socio...' : 'Confirmar y Registrar Socio Oficial'}
+                    {isSubmitting ? 'Registrando Socio...' : 'Confirmar y Registrar Socio'}
                   </button>
                 </form>
               </div>
             </div>
-
           </div>
         )}
 
+        {/* GESTIÓN DE PERSONAL */}
         {activeTab === 'workers' && (
           <WorkersPanel 
             adminWorker={workerSession}
