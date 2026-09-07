@@ -73,7 +73,7 @@ export default function DniPhotoCapture({
         acquiredStream = await navigator.mediaDevices.getUserMedia(constraints);
         if (acquiredStream) break;
       } catch (e) {
-        // probar siguiente restricción
+        // siguiente restriccion
       }
     }
 
@@ -140,23 +140,23 @@ export default function DniPhotoCapture({
   };
 
   return (
-    <div className="bg-panel-dark border border-border-dark rounded-2xl p-4 space-y-4">
+    <div className="bg-panel-dark border border-border-dark rounded-2xl p-3 sm:p-4 space-y-3.5">
       <canvas ref={canvasRef} className="hidden" />
 
-      <div className="flex items-center justify-between border-b border-border-dark pb-3">
+      <div className="flex items-center justify-between border-b border-border-dark pb-2.5">
         <div className="flex items-center gap-2">
-          <IdCard className="text-brand-red" size={18} />
-          <h4 className="text-xs font-display font-bold text-white uppercase tracking-wider">
-            Fotografías del Documento (DNI/Pasaporte)
+          <IdCard className="text-brand-red shrink-0" size={16} />
+          <h4 className="text-[11px] sm:text-xs font-display font-bold text-white uppercase tracking-wider">
+            Documento DNI / Pasaporte
           </h4>
         </div>
-        <span className="text-[10px] font-mono text-gray-400">
-          Requerido para exportación PDF
+        <span className="text-[9px] font-mono text-gray-400">
+          Requerido PDF
         </span>
       </div>
 
       {isCameraActive ? (
-        <div className="relative aspect-[16/10] bg-black rounded-xl overflow-hidden border border-brand-red/60 shadow-inner">
+        <div className="relative aspect-[4/3] sm:aspect-[16/10] bg-black rounded-xl overflow-hidden border border-brand-red/60 shadow-inner">
           <video
             ref={videoRef}
             className="w-full h-full object-cover"
@@ -165,36 +165,34 @@ export default function DniPhotoCapture({
             muted
           />
 
-          <div className="absolute top-2 left-2 bg-black/80 px-3 py-1.5 rounded-lg text-[10px] font-mono text-white font-bold uppercase border border-border-dark flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse"></span>
-            Capturando: {activeTarget === 'front' ? 'PARTE DELANTERA (ANVERSO)' : 'PARTE TRASERA (REVERSO)'}
+          <div className="absolute top-2 left-2 right-12 sm:right-auto bg-black/85 px-2.5 py-1 rounded-lg text-[9px] sm:text-[10px] font-mono text-white font-bold uppercase border border-border-dark flex items-center gap-1.5 truncate">
+            <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse shrink-0"></span>
+            <span className="truncate">Captura: {activeTarget === 'front' ? 'Anverso' : 'Reverso'}</span>
           </div>
 
           <button
             type="button"
             onClick={toggleCameraFacing}
-            className="absolute top-2 right-2 p-2 bg-black/80 hover:bg-gray-800 text-gray-200 rounded-lg border border-border-dark text-[10px] font-mono font-bold flex items-center gap-1.5 transition-all"
+            className="absolute top-2 right-2 p-2 bg-black/85 hover:bg-gray-800 text-gray-200 rounded-lg border border-border-dark transition-all"
             title="Cambiar Cámara"
           >
             <SwitchCamera size={14} />
-            <span className="hidden sm:inline">Cambiar Cámara</span>
           </button>
 
-          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2 px-4 z-10">
+          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2 px-3 z-10">
             <button
               type="button"
               onClick={takePhoto}
-              className="px-5 py-2.5 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl font-bold text-xs uppercase flex items-center gap-2 shadow-xl border border-brand-red/40"
+              className="flex-1 max-w-xs py-2.5 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 shadow-xl border border-brand-red/40"
             >
-              <Camera size={16} /> Tomar Foto {activeTarget === 'front' ? 'Delantera' : 'Trasera'}
+              <Camera size={15} /> Capturar {activeTarget === 'front' ? 'Anverso' : 'Reverso'}
             </button>
             <button
               type="button"
               onClick={stopStream}
-              className="p-2.5 bg-gray-900/90 hover:bg-gray-800 text-gray-300 rounded-xl border border-border-dark hover:text-white"
-              title="Cerrar Cámara"
+              className="p-2.5 bg-gray-900/90 hover:bg-gray-800 text-gray-300 rounded-xl border border-border-dark"
             >
-              <CameraOff size={16} />
+              <CameraOff size={15} />
             </button>
           </div>
         </div>
@@ -203,24 +201,25 @@ export default function DniPhotoCapture({
           type="button"
           disabled={isStarting}
           onClick={() => startCamera('environment')}
-          className="w-full py-3.5 bg-brand-dark hover:bg-border-dark border border-border-dark hover:border-brand-red text-gray-200 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 transition-all shadow-md"
+          className="w-full py-3 bg-brand-dark hover:bg-border-dark border border-border-dark hover:border-brand-red text-gray-200 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 transition-all shadow-md active:scale-98"
         >
           {isStarting ? (
             <>
-              <RefreshCw size={16} className="animate-spin text-brand-red" />
+              <RefreshCw size={15} className="animate-spin text-brand-red" />
               <span>Iniciando Cámara...</span>
             </>
           ) : (
             <>
-              <Camera size={16} className="text-brand-red" />
-              <span>Activar Cámara para tomar fotos DNI</span>
+              <Camera size={15} className="text-brand-red" />
+              <span>Tomar Fotos DNI con Cámara</span>
             </>
           )}
         </button>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        {/* PARTE DELANTERA */}
+      {/* Reorganización responsive: 1 columna en móviles, 2 en pantallas más grandes */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* ANVERSO */}
         <div className="bg-brand-dark p-3 rounded-xl border border-border-dark space-y-2">
           <div className="flex justify-between items-center text-[10px] font-mono font-bold text-gray-400 uppercase">
             <span>Parte Delantera (Anverso)</span>
@@ -232,28 +231,27 @@ export default function DniPhotoCapture({
               <div className="relative aspect-[1.58/1] rounded-lg overflow-hidden border border-border-dark">
                 <img src={frontImage} alt="DNI Delantera" className="w-full h-full object-cover" />
               </div>
-              <div className="flex gap-1.5">
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => { setActiveTarget('front'); startCamera(); }}
-                  className="flex-1 py-1 px-2 bg-panel-dark border border-border-dark hover:border-gray-600 rounded-lg text-[10px] font-bold text-gray-300 flex items-center justify-center gap-1"
+                  className="flex-1 py-1.5 px-2 bg-panel-dark border border-border-dark hover:border-gray-600 rounded-lg text-[10px] font-bold text-gray-300 flex items-center justify-center gap-1 active:bg-gray-800"
                 >
                   <Camera size={11} /> Repetir
                 </button>
                 <button
                   type="button"
                   onClick={() => onChangeFront(null)}
-                  className="py-1 px-2.5 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 text-rose-400 rounded-lg text-[10px] font-bold flex items-center gap-1"
-                  title="Borrar Foto Delantera"
+                  className="py-1.5 px-3 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 text-rose-400 rounded-lg text-[10px] font-bold flex items-center gap-1 active:bg-rose-500/30"
                 >
                   <Trash2 size={11} /> Borrar
                 </button>
               </div>
             </div>
           ) : (
-            <label className="aspect-[1.58/1] border-2 border-dashed border-border-dark hover:border-brand-red/50 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-panel-dark/40 hover:bg-panel-dark transition-all">
-              <Upload size={16} className="text-gray-500" />
-              <span className="text-[9px] font-mono text-gray-400 uppercase">Subir Imagen</span>
+            <label className="aspect-[1.58/1] border-2 border-dashed border-border-dark hover:border-brand-red/50 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-panel-dark/40 hover:bg-panel-dark transition-all p-2">
+              <Upload size={18} className="text-gray-500" />
+              <span className="text-[10px] font-mono text-gray-400 uppercase font-semibold">Subir Foto Anverso</span>
               <input
                 type="file"
                 accept="image/*"
@@ -264,7 +262,7 @@ export default function DniPhotoCapture({
           )}
         </div>
 
-        {/* PARTE TRASERA */}
+        {/* REVERSO */}
         <div className="bg-brand-dark p-3 rounded-xl border border-border-dark space-y-2">
           <div className="flex justify-between items-center text-[10px] font-mono font-bold text-gray-400 uppercase">
             <span>Parte Trasera (Reverso)</span>
@@ -276,28 +274,27 @@ export default function DniPhotoCapture({
               <div className="relative aspect-[1.58/1] rounded-lg overflow-hidden border border-border-dark">
                 <img src={backImage} alt="DNI Trasera" className="w-full h-full object-cover" />
               </div>
-              <div className="flex gap-1.5">
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => { setActiveTarget('back'); startCamera(); }}
-                  className="flex-1 py-1 px-2 bg-panel-dark border border-border-dark hover:border-gray-600 rounded-lg text-[10px] font-bold text-gray-300 flex items-center justify-center gap-1"
+                  className="flex-1 py-1.5 px-2 bg-panel-dark border border-border-dark hover:border-gray-600 rounded-lg text-[10px] font-bold text-gray-300 flex items-center justify-center gap-1 active:bg-gray-800"
                 >
                   <Camera size={11} /> Repetir
                 </button>
                 <button
                   type="button"
                   onClick={() => onChangeBack(null)}
-                  className="py-1 px-2.5 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 text-rose-400 rounded-lg text-[10px] font-bold flex items-center gap-1"
-                  title="Borrar Foto Trasera"
+                  className="py-1.5 px-3 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 text-rose-400 rounded-lg text-[10px] font-bold flex items-center gap-1 active:bg-rose-500/30"
                 >
                   <Trash2 size={11} /> Borrar
                 </button>
               </div>
             </div>
           ) : (
-            <label className="aspect-[1.58/1] border-2 border-dashed border-border-dark hover:border-brand-red/50 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-panel-dark/40 hover:bg-panel-dark transition-all">
-              <Upload size={16} className="text-gray-500" />
-              <span className="text-[9px] font-mono text-gray-400 uppercase">Subir Imagen</span>
+            <label className="aspect-[1.58/1] border-2 border-dashed border-border-dark hover:border-brand-red/50 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-panel-dark/40 hover:bg-panel-dark transition-all p-2">
+              <Upload size={18} className="text-gray-500" />
+              <span className="text-[10px] font-mono text-gray-400 uppercase font-semibold">Subir Foto Reverso</span>
               <input
                 type="file"
                 accept="image/*"

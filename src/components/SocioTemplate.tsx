@@ -191,7 +191,7 @@ export default function SocioTemplate({
         await onUpdateMember(updatedData);
       }
       setCurrentMember(updatedData);
-      setSaveSuccess("¡Ficha y fotografías actualizadas exitosamente!");
+      setSaveSuccess("¡Ficha y fotografías actualizadas!");
       await fetchAuditLogs();
       setTimeout(() => {
         setActiveTab('badge');
@@ -248,7 +248,7 @@ export default function SocioTemplate({
         const updated = { ...currentMember, signedPdf: base64Pdf, signed_pdf: base64Pdf };
         setCurrentMember(updated);
         if (onUpdateMember) onUpdateMember(updated);
-        alert('¡PDF firmado subido y guardado correctamente en la ficha del socio!');
+        alert('¡PDF firmado subido y guardado correctamente!');
       } catch (err: any) {
         alert('Error al guardar el PDF firmado: ' + err.message);
       } finally {
@@ -315,14 +315,14 @@ export default function SocioTemplate({
   const signedPdfData = currentMember.signedPdf || currentMember.signed_pdf;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 bg-black/85 backdrop-blur-md no-print">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/90 backdrop-blur-md no-print overflow-hidden">
       <ConfirmModal
         isOpen={confirmDelete}
         type="danger"
         title="¿Confirmar baja del socio?"
         message={
           <span>
-            Esta acción eliminará de forma permanente a <strong className="text-white font-bold">{currentMember.firstName} {currentMember.lastName}</strong> ({currentMember.dniPassport}) de la base de datos de la asociación Cannábica Svadhisthana.
+            Esta acción eliminará a <strong className="text-white font-bold">{currentMember.firstName} {currentMember.lastName}</strong> ({currentMember.dniPassport}) permanentemente.
           </span>
         }
         confirmText="Sí, Eliminar Socio"
@@ -332,75 +332,71 @@ export default function SocioTemplate({
         onCancel={() => setConfirmDelete(false)}
       />
 
-      <div className="relative w-full max-w-4xl bg-panel-dark border border-border-dark rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row h-[92vh] md:h-auto max-h-[92vh]">
+      <div className="relative w-full h-full md:h-auto md:max-h-[92vh] max-w-4xl bg-panel-dark md:border md:border-border-dark md:rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row">
+        
+        {/* Botón Cerrar */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 p-2 text-gray-400 hover:text-white bg-gray-900/80 rounded-full border border-border-dark hover:border-brand-red transition-all"
+          className="absolute top-3 right-3 z-30 p-2 text-gray-400 hover:text-white bg-gray-900/90 rounded-full border border-border-dark transition-all"
         >
           <X size={18} />
         </button>
 
-        <div className="flex-1 bg-brand-dark p-5 md:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-border-dark overflow-y-auto">
-          <div className="flex items-center justify-between gap-3 mb-4 border-b border-border-dark pb-3">
-            <div className="flex items-center gap-1.5 bg-panel-dark p-1 rounded-xl border border-border-dark flex-wrap">
+        {/* Panel Principal */}
+        <div className="flex-1 bg-brand-dark p-4 sm:p-6 md:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-border-dark overflow-y-auto">
+          
+          <div className="flex items-center justify-between gap-2 mb-4 border-b border-border-dark pb-3">
+            <div className="flex items-center gap-1 bg-panel-dark p-1 rounded-xl border border-border-dark flex-wrap">
               <button
                 type="button"
                 onClick={() => { setActiveTab('badge'); setSaveError(null); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${activeTab === 'badge'
-                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/20'
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${activeTab === 'badge'
+                    ? 'bg-brand-red text-white shadow-md'
                     : 'text-gray-400 hover:text-white'
                   }`}
               >
                 <IdCard size={13} />
-                Ficha Socio
+                Carnet
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveTab('edit'); resetEditForm(); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${activeTab === 'edit'
-                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/20'
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${activeTab === 'edit'
+                    ? 'bg-brand-red text-white shadow-md'
                     : 'text-gray-400 hover:text-white'
                   }`}
               >
                 <Edit3 size={13} />
-                Editar Datos
+                Editar
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveTab('audit'); fetchAuditLogs(); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${activeTab === 'audit'
-                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/20'
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${activeTab === 'audit'
+                    ? 'bg-brand-red text-white shadow-md'
                     : 'text-gray-400 hover:text-white'
                   }`}
               >
                 <History size={13} />
                 Auditoría
-                {auditLogs.length > 0 && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${activeTab === 'audit' ? 'bg-white/20 text-white' : 'bg-emerald-950 text-emerald-400 border border-emerald-500/40'
-                    }`}>
-                    {auditLogs.length}
-                  </span>
-                )}
               </button>
             </div>
 
-            <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-mono text-gray-400">
-              <span>ID:</span>
+            <div className="text-[10px] font-mono text-gray-400 pr-10 md:pr-0">
               <span className="text-brand-red font-bold">#{currentMember.id.slice(0, 8)}</span>
             </div>
           </div>
 
+          {/* EDITAR DATOS */}
           {activeTab === 'edit' && (
-            <form onSubmit={handleSaveEdit} className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-display font-bold text-white uppercase tracking-wider">
-                    Modificar Información del Socio
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Actualiza los campos oficiales y fotografías del DNI en la base de datos.
-                  </p>
-                </div>
+            <form onSubmit={handleSaveEdit} className="space-y-4 pb-6 md:pb-0">
+              <div>
+                <h3 className="text-xs font-display font-bold text-white uppercase tracking-wider">
+                  Modificar Socio
+                </h3>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Edita datos y fotografías del DNI.
+                </p>
               </div>
 
               {saveError && (
@@ -417,22 +413,17 @@ export default function SocioTemplate({
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold">
-                  Fotografías del Documento DNI / Pasaporte
-                </label>
-                <DniPhotoCapture
-                  frontImage={editDniFront}
-                  backImage={editDniBack}
-                  onChangeFront={setEditDniFront}
-                  onChangeBack={setEditDniBack}
-                />
-              </div>
+              <DniPhotoCapture
+                frontImage={editDniFront}
+                backImage={editDniBack}
+                onChangeFront={setEditDniFront}
+                onChangeBack={setEditDniBack}
+              />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
-                    Nombre <span className="text-brand-red">*</span>
+                    Nombre *
                   </label>
                   <input
                     type="text"
@@ -445,7 +436,7 @@ export default function SocioTemplate({
 
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
-                    Apellidos <span className="text-brand-red">*</span>
+                    Apellidos *
                   </label>
                   <input
                     type="text"
@@ -458,7 +449,7 @@ export default function SocioTemplate({
 
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
-                    Tipo de Documento
+                    Tipo Documento
                   </label>
                   <select
                     value={editDocType}
@@ -472,7 +463,7 @@ export default function SocioTemplate({
 
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
-                    N° Documento <span className="text-brand-red">*</span>
+                    N° Documento *
                   </label>
                   <input
                     type="text"
@@ -497,7 +488,7 @@ export default function SocioTemplate({
 
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
-                    Estado de Registro
+                    Estado Registro
                   </label>
                   <select
                     value={editStatus}
@@ -505,14 +496,14 @@ export default function SocioTemplate({
                     className="w-full h-9 px-3 bg-panel-dark border border-border-dark rounded-xl text-white font-medium focus:outline-none focus:border-brand-red"
                   >
                     <option value="approved">Aprobado / Activo</option>
-                    <option value="pending">Pendiente de Aprobación</option>
+                    <option value="pending">Pendiente</option>
                     <option value="rejected">Rechazado</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
-                    Fecha de Nacimiento
+                    Fecha Nacimiento
                   </label>
                   <input
                     type="date"
@@ -524,7 +515,7 @@ export default function SocioTemplate({
 
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
-                    Fecha de Caducidad
+                    Fecha Caducidad
                   </label>
                   <input
                     type="date"
@@ -536,64 +527,46 @@ export default function SocioTemplate({
 
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
-                    Género
-                  </label>
-                  <select
-                    value={editGender}
-                    onChange={e => setEditGender(e.target.value as any)}
-                    className="w-full h-9 px-3 bg-panel-dark border border-border-dark rounded-xl text-white font-medium focus:outline-none focus:border-brand-red"
-                  >
-                    <option value="MASCULINO">MASCULINO</option>
-                    <option value="FEMENINO">FEMENINO</option>
-                    <option value="OTRO">OTRO</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
                     Teléfono
                   </label>
                   <input
                     type="tel"
                     value={editPhone}
                     onChange={e => setEditPhone(e.target.value)}
-                    placeholder="+34 600 000 000"
                     className="w-full h-9 px-3 bg-panel-dark border border-border-dark rounded-xl text-white font-medium focus:outline-none focus:border-brand-red"
                   />
                 </div>
 
-                <div className="sm:col-span-2">
+                <div>
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
-                    Correo Electrónico
+                    Correo
                   </label>
                   <input
                     type="email"
                     value={editEmail}
                     onChange={e => setEditEmail(e.target.value)}
-                    placeholder="socio@email.com"
                     className="w-full h-9 px-3 bg-panel-dark border border-border-dark rounded-xl text-white font-medium focus:outline-none focus:border-brand-red"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
-                    Dirección Física
+                    Dirección
                   </label>
                   <input
                     type="text"
                     value={editAddress}
                     onChange={e => setEditAddress(e.target.value)}
-                    placeholder="Calle, número, piso, ciudad"
                     className="w-full h-9 px-3 bg-panel-dark border border-border-dark rounded-xl text-white font-medium focus:outline-none focus:border-brand-red"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-4 border-t border-border-dark">
+              <div className="flex items-center gap-3 pt-3 border-t border-border-dark">
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex-1 h-10 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-brand-red/20 transition-all"
+                  className="flex-1 h-10 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg"
                 >
                   <Save size={14} />
                   {isSaving ? "Guardando..." : "Guardar Cambios"}
@@ -602,7 +575,7 @@ export default function SocioTemplate({
                   type="button"
                   onClick={() => { setActiveTab('badge'); resetEditForm(); }}
                   disabled={isSaving}
-                  className="px-4 h-10 bg-gray-900 border border-border-dark hover:border-gray-600 text-gray-300 rounded-xl text-xs font-bold transition-all"
+                  className="px-4 h-10 bg-gray-900 border border-border-dark text-gray-300 rounded-xl text-xs font-bold"
                 >
                   Cancelar
                 </button>
@@ -610,113 +583,86 @@ export default function SocioTemplate({
             </form>
           )}
 
+          {/* FICHA TIPO CARNET */}
           {activeTab === 'badge' && (
             <div className="space-y-4">
-              <div className="border border-border-dark/60 rounded-2xl p-5 relative bg-gradient-to-b from-panel-dark/40 to-brand-dark overflow-hidden">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-8xl font-black font-display text-gray-800/5 select-none pointer-events-none uppercase tracking-widest text-center">
-                  SVADHISTHANA
-                </div>
-
-                <div className="flex justify-between items-start border-b border-border-dark pb-4 mb-4">
+              <div className="border border-border-dark/60 rounded-2xl p-4 sm:p-5 relative bg-gradient-to-b from-panel-dark/40 to-brand-dark overflow-hidden">
+                <div className="flex justify-between items-start border-b border-border-dark pb-3 mb-3">
                   <div>
-                    <span className="text-[10px] font-mono text-brand-red font-bold tracking-widest uppercase">
+                    <span className="text-[9px] font-mono text-brand-red font-bold tracking-widest uppercase">
                       ASOCIACIÓN CANNABICA SVADHISTHANA
                     </span>
-                    <h4 className="text-lg font-display font-bold text-gray-100 mt-1">
+                    <h4 className="text-base font-display font-bold text-gray-100 mt-0.5">
                       FICHA OFICIAL DE SOCIO
                     </h4>
                   </div>
-                  <div className="text-right">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${currentMember.registrationStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        currentMember.registrationStatus === 'pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                          'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                  <div>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${currentMember.registrationStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                       }`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                      {currentMember.registrationStatus === 'approved' ? 'Aprobado' :
-                        currentMember.registrationStatus === 'pending' ? 'Pendiente' : 'Rechazado'}
+                      {currentMember.registrationStatus === 'approved' ? 'Aprobado' : 'Pendiente'}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-                  <div className="w-28 h-36 bg-emerald-600 rounded-xl border border-emerald-400/50 flex flex-col items-center justify-center relative overflow-hidden shrink-0 shadow-lg shadow-emerald-950/40">
-                    <span className="text-3xl font-display font-black text-white tracking-wider">
+                <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
+                  <div className="w-24 h-32 bg-emerald-600 rounded-xl border border-emerald-400/50 flex flex-col items-center justify-center relative overflow-hidden shrink-0 shadow-lg">
+                    <span className="text-2xl font-display font-black text-white">
                       {currentMember.firstName.charAt(0)}{currentMember.lastName.charAt(0)}
                     </span>
-                    <span className="absolute bottom-2 text-[8px] font-mono text-white font-bold uppercase tracking-wider bg-emerald-800/90 px-2 py-0.5 rounded">
-                      FOTO SOCIO
+                    <span className="absolute bottom-1 text-[7px] font-mono text-white font-bold uppercase bg-emerald-800/90 px-1.5 py-0.5 rounded">
+                      FOTO
                     </span>
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-white/40 animate-pulse"></div>
                   </div>
 
-                  <div className="flex-1 grid grid-cols-2 gap-y-3.5 gap-x-4 text-xs w-full">
+                  <div className="flex-1 grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs w-full">
                     <div>
-                      <p className="text-[9px] font-mono text-gray-500 font-semibold uppercase">Apellidos / Surname</p>
-                      <p className="font-bold text-gray-200 mt-0.5">{currentMember.lastName}</p>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Apellidos</p>
+                      <p className="font-bold text-gray-200 mt-0.5 truncate">{currentMember.lastName}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-mono text-gray-500 font-semibold uppercase">Nombre / Given Name</p>
-                      <p className="font-bold text-gray-200 mt-0.5">{currentMember.firstName}</p>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Nombre</p>
+                      <p className="font-bold text-gray-200 mt-0.5 truncate">{currentMember.firstName}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-mono text-gray-500 font-semibold uppercase">ID Documento / Doc ID</p>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">ID Documento</p>
                       <p className="font-mono font-bold text-brand-red mt-0.5">{currentMember.dniPassport}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-mono text-gray-500 font-semibold uppercase">Tipo / Document Type</p>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Tipo</p>
                       <p className="font-bold text-gray-200 mt-0.5">{currentMember.documentType}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-mono text-gray-500 font-semibold uppercase">Nacionalidad / Nationality</p>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Nacionalidad</p>
                       <p className="font-bold text-gray-200 mt-0.5">{currentMember.nationality}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-mono text-gray-500 font-semibold uppercase">Nacimiento / Date of Birth</p>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Nacimiento</p>
                       <p className="font-bold text-gray-200 mt-0.5">{currentMember.birthDate || 'N/D'}</p>
                     </div>
-                    <div className="col-span-2 border-t border-border-dark/60 pt-3">
-                      <p className="text-[9px] font-mono text-gray-500 font-semibold uppercase">Validez / Expiry Date</p>
-                      <p className="font-bold text-gray-200 mt-0.5">{currentMember.expiryDate || 'PERMANENTE'}</p>
-                    </div>
                   </div>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-border-dark flex justify-between items-center">
-                  <div className="font-mono text-[9px] text-gray-500">
-                    <p>REGISTRO ASOCIACIÓN: {new Date(currentMember.registerDate).toLocaleDateString()}</p>
-                    <p className="text-gray-600 mt-0.5">UID: {currentMember.id.toUpperCase()}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-panel-dark/50 border border-border-dark flex items-center gap-3">
-                <CheckCircle size={16} className="text-emerald-500 shrink-0" />
-                <div className="text-[11px] text-gray-400">
-                  <p className="font-semibold text-gray-200">Expediente Oficial Verificado</p>
-                  <p>Registrado por {currentMember.registeredBy?.name || 'ADMIN'} el {new Date(currentMember.registerDate).toLocaleDateString()}</p>
                 </div>
               </div>
 
               {(frontImageDisplay || backImageDisplay) && (
-                <div className="grid grid-cols-2 gap-3 bg-brand-dark p-4 rounded-2xl border border-border-dark mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-brand-dark p-3 sm:p-4 rounded-2xl border border-border-dark">
                   <div>
-                    <p className="text-[10px] font-mono text-gray-400 uppercase font-bold mb-2">DNI Delantera (Anverso)</p>
+                    <p className="text-[9px] font-mono text-gray-400 uppercase font-bold mb-1.5">DNI Anverso</p>
                     {frontImageDisplay ? (
                       <img src={frontImageDisplay} alt="DNI Delantera" className="w-full aspect-[1.58/1] object-cover rounded-xl border border-border-dark" />
                     ) : (
                       <div className="aspect-[1.58/1] bg-panel-dark border border-dashed border-border-dark rounded-xl flex items-center justify-center text-xs text-gray-500">
-                        Sin foto delantera
+                        Sin foto
                       </div>
                     )}
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-mono text-gray-400 uppercase font-bold mb-2">DNI Trasera (Reverso)</p>
+                    <p className="text-[9px] font-mono text-gray-400 uppercase font-bold mb-1.5">DNI Reverso</p>
                     {backImageDisplay ? (
                       <img src={backImageDisplay} alt="DNI Trasera" className="w-full aspect-[1.58/1] object-cover rounded-xl border border-border-dark" />
                     ) : (
                       <div className="aspect-[1.58/1] bg-panel-dark border border-dashed border-border-dark rounded-xl flex items-center justify-center text-xs text-gray-500">
-                        Sin foto trasera
+                        Sin foto
                       </div>
                     )}
                   </div>
@@ -725,187 +671,74 @@ export default function SocioTemplate({
             </div>
           )}
 
+          {/* AUDITORÍA */}
           {activeTab === 'audit' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-border-dark">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <History size={16} className="text-emerald-400" />
-                    <h3 className="text-sm font-display font-bold text-white uppercase tracking-wider">
-                      Historial de Auditoría & Trazabilidad
-                    </h3>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Registro auditable: quién editó, qué campo se cambió y fecha exacta.
-                  </p>
-                </div>
-
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-border-dark">
+                <h3 className="text-xs font-display font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <History size={14} className="text-emerald-400" />
+                  Historial de Auditoría
+                </h3>
                 <button
                   type="button"
                   onClick={fetchAuditLogs}
                   disabled={isLoadingLogs}
-                  className="px-2.5 py-1.5 bg-panel-dark border border-border-dark hover:border-emerald-500/40 text-gray-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
-                  title="Recargar logs"
+                  className="p-1 bg-panel-dark border border-border-dark text-gray-300 rounded-lg text-xs"
                 >
-                  <RefreshCw size={12} className={`text-emerald-400 ${isLoadingLogs ? 'animate-spin' : ''}`} />
-                  <span>Actualizar</span>
+                  <RefreshCw size={12} className={isLoadingLogs ? 'animate-spin' : ''} />
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-2.5 py-1">
-                <div className="p-3 bg-panel-dark/70 rounded-xl border border-border-dark/80">
-                  <span className="text-[10px] font-mono uppercase text-gray-400 font-semibold block">Total Registros</span>
-                  <span className="text-base font-display font-bold text-white mt-0.5 block">{auditLogs.length}</span>
-                </div>
-                <div className="p-3 bg-panel-dark/70 rounded-xl border border-border-dark/80">
-                  <span className="text-[10px] font-mono uppercase text-gray-400 font-semibold block">Socio Auditado</span>
-                  <span className="text-xs font-mono font-bold text-emerald-400 mt-1 block truncate">
-                    {currentMember.dniPassport}
-                  </span>
-                </div>
-                <div className="p-3 bg-panel-dark/70 rounded-xl border border-border-dark/80">
-                  <span className="text-[10px] font-mono uppercase text-gray-400 font-semibold block">Último Cambio</span>
-                  <span className="text-xs font-medium text-gray-300 mt-1 block truncate">
-                    {auditLogs[0] ? new Date(auditLogs[0].timestamp).toLocaleDateString() : 'Ninguno'}
-                  </span>
-                </div>
-              </div>
-
-              {isLoadingLogs && auditLogs.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
-                  <RefreshCw size={24} className="text-emerald-400 animate-spin" />
-                  <p className="text-xs text-gray-400 font-medium">Consultando registro de auditoría...</p>
-                </div>
-              ) : auditLogs.length === 0 ? (
-                <div className="py-12 px-4 rounded-2xl bg-panel-dark/40 border border-border-dark/60 text-center space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mx-auto">
-                    <History size={24} />
-                  </div>
-                  <h4 className="text-sm font-bold text-white">Sin registros de auditoría</h4>
-                  <p className="text-xs text-gray-400 max-w-sm mx-auto">
-                    Cualquier edición de datos, modificación de estado o registro quedará automáticamente guardado en esta bitácora.
-                  </p>
-                </div>
+              {auditLogs.length === 0 ? (
+                <p className="text-xs text-gray-500 text-center py-6">Sin registros de auditoría.</p>
               ) : (
-                <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-                  {auditLogs.map((log) => {
-                    const isAlta = log.action?.includes('ALTA');
-                    const isEstado = log.action?.includes('ESTADO') || log.action?.includes('APROB') || log.action?.includes('RECHAZ');
-                    const isBaja = log.action?.includes('BAJA');
-
-                    return (
-                      <div
-                        key={log.id}
-                        className="p-3.5 bg-panel-dark/80 hover:bg-panel-dark border border-border-dark/90 hover:border-emerald-500/30 rounded-2xl transition-all space-y-2.5"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase border ${isAlta ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' :
-                                isBaja ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' :
-                                  isEstado ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' :
-                                    'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
-                              }`}>
-                              {log.action}
-                            </span>
-
-                            <span className="text-[11px] font-mono text-gray-400 flex items-center gap-1">
-                              <Clock size={11} className="text-gray-500" />
-                              {new Date(log.timestamp).toLocaleString('es-ES', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0 bg-brand-dark px-2 py-1 rounded-lg border border-border-dark">
-                            <div className="w-5 h-5 rounded bg-emerald-600 border border-emerald-400/40 flex items-center justify-center text-white font-bold text-[10px] shadow-sm">
-                              {log.workerName ? log.workerName.charAt(0).toUpperCase() : 'W'}
-                            </div>
-                            <div className="text-left">
-                              <span className="text-[11px] font-bold text-gray-200 block leading-tight">
-                                {log.workerName}
-                              </span>
-                              <span className="text-[9px] font-mono text-gray-400 uppercase">
-                                {log.workerRole === 'admin' ? 'Admin' : 'Operador'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-gray-300 leading-relaxed">
-                          {log.details}
-                        </p>
-
-                        {log.changes && log.changes.length > 0 && (
-                          <div className="mt-2 pt-2 border-t border-border-dark/60 space-y-1.5">
-                            <span className="text-[10px] font-mono uppercase text-gray-400 font-bold block">
-                              Campos modificados:
-                            </span>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {log.changes.map((ch, idx) => (
-                                <div key={idx} className="p-2 bg-brand-dark/90 rounded-xl border border-border-dark/70 text-xs">
-                                  <div className="font-semibold text-gray-300 text-[11px] mb-1">
-                                    {ch.label || ch.field}
-                                  </div>
-                                  <div className="flex items-center gap-1.5 text-[11px] font-mono flex-wrap">
-                                    <span className="line-through text-rose-400/80 bg-rose-500/10 px-1.5 py-0.5 rounded">
-                                      {String(ch.from || '(vacío)')}
-                                    </span>
-                                    <ArrowRight size={11} className="text-gray-500 shrink-0" />
-                                    <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                      {String(ch.to || '(vacío)')}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1 text-xs">
+                  {auditLogs.map((log) => (
+                    <div key={log.id} className="p-3 bg-panel-dark rounded-xl border border-border-dark space-y-1">
+                      <div className="flex justify-between items-center text-[10px] font-mono text-gray-400">
+                        <span className="font-bold text-emerald-400">{log.action}</span>
+                        <span>{new Date(log.timestamp).toLocaleDateString()}</span>
                       </div>
-                    );
-                  })}
+                      <p className="text-[11px] text-gray-300">{log.details}</p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <div className="w-full md:w-80 bg-panel-dark p-6 flex flex-col justify-between overflow-y-auto shrink-0">
-          <div className="space-y-5">
+        {/* Panel Lateral de Datos de Contacto y Acciones */}
+        <div className="w-full md:w-80 bg-panel-dark p-4 sm:p-6 flex flex-col justify-between overflow-y-auto shrink-0 space-y-4">
+          <div className="space-y-4">
             <div>
               <h4 className="text-xs font-display font-semibold text-gray-200 uppercase tracking-wider">
                 Datos de Contacto
               </h4>
-              <p className="text-[11px] text-gray-500 mt-0.5">
-                Información del socio en el sistema
-              </p>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="flex items-start gap-2.5">
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-start gap-2">
                 <Mail size={13} className="text-brand-red shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <p className="text-[9px] font-mono text-gray-500 uppercase">Correo</p>
+                  <p className="text-[8px] font-mono text-gray-500 uppercase">Correo</p>
                   <p className="font-medium text-gray-300 truncate">{currentMember.email || 'No proporcionado'}</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5">
+              <div className="flex items-start gap-2">
                 <Phone size={13} className="text-brand-red shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-[9px] font-mono text-gray-500 uppercase">Teléfono</p>
+                  <p className="text-[8px] font-mono text-gray-500 uppercase">Teléfono</p>
                   <p className="font-medium text-gray-300">{currentMember.phone || 'No proporcionado'}</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5">
+              <div className="flex items-start gap-2">
                 <MapPin size={13} className="text-brand-red shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-[9px] font-mono text-gray-500 uppercase">Dirección</p>
-                  <p className="font-medium text-gray-300 leading-relaxed">{currentMember.address || 'No proporcionado'}</p>
+                  <p className="text-[8px] font-mono text-gray-500 uppercase">Dirección</p>
+                  <p className="font-medium text-gray-300 leading-tight">{currentMember.address || 'No proporcionado'}</p>
                 </div>
               </div>
             </div>
@@ -926,31 +759,30 @@ export default function SocioTemplate({
                     <FileCheck size={13} className="text-emerald-400" /> PDF Firmado
                   </span>
                   {signedPdfData ? (
-                    <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold">
+                    <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono font-bold">
                       GUARDADO
                     </span>
                   ) : (
-                    <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-mono font-bold">
+                    <span className="text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-mono font-bold">
                       PENDIENTE
                     </span>
                   )}
                 </div>
 
                 {signedPdfData ? (
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={handleDownloadSignedPdf}
-                      className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow transition-all"
+                      className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow"
                     >
-                      <Eye size={12} /> Ver / Descargar PDF Firmado
+                      <Eye size={12} /> Ver PDF
                     </button>
                     <button
                       type="button"
                       onClick={() => pdfInputRef.current?.click()}
                       disabled={isUploadingPdf}
-                      className="p-1.5 bg-panel-dark border border-border-dark hover:border-gray-600 text-gray-300 rounded-lg text-xs font-bold"
-                      title="Reemplazar PDF Firmado"
+                      className="p-1.5 bg-panel-dark border border-border-dark text-gray-300 rounded-lg text-xs font-bold"
                     >
                       <Upload size={12} />
                     </button>
@@ -960,109 +792,39 @@ export default function SocioTemplate({
                     type="button"
                     onClick={() => pdfInputRef.current?.click()}
                     disabled={isUploadingPdf}
-                    className="w-full py-2 bg-brand-dark hover:bg-border-dark border border-dashed border-border-dark hover:border-brand-red text-gray-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all"
+                    className="w-full py-2 bg-brand-dark border border-dashed border-border-dark text-gray-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
                   >
-                    {isUploadingPdf ? (
-                      <>
-                        <RefreshCw size={12} className="animate-spin text-brand-red" /> Subiendo...
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={12} className="text-brand-red" /> Subir PDF Firmado del Socio
-                      </>
-                    )}
+                    {isUploadingPdf ? <RefreshCw size={12} className="animate-spin text-brand-red" /> : <Upload size={12} className="text-brand-red" />}
+                    <span>Subir PDF Firmado</span>
                   </button>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => { setActiveTab('badge'); setSaveError(null); }}
-                  className={`h-9 border rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${activeTab === 'badge'
-                      ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 shadow-sm'
-                      : 'bg-brand-dark border-border-dark hover:border-gray-600 text-gray-300'
-                    }`}
-                >
-                  <IdCard size={13} className="text-emerald-400" />
-                  Carnet
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setActiveTab('edit'); resetEditForm(); }}
-                  className={`h-9 border rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${activeTab === 'edit'
-                      ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 shadow-sm'
-                      : 'bg-brand-dark border-border-dark hover:border-gray-600 text-gray-300'
-                    }`}
-                >
-                  <Edit3 size={13} className="text-emerald-400" />
-                  Editar
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => { setActiveTab('audit'); fetchAuditLogs(); }}
-                className={`w-full h-9 border rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${activeTab === 'audit'
-                    ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 shadow-sm'
-                    : 'bg-brand-dark border-border-dark hover:border-emerald-500/40 text-gray-300 hover:text-white'
-                  }`}
-              >
-                <History size={13} className="text-emerald-400" />
-                Historial de Auditoría ({auditLogs.length})
-              </button>
-
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}
-                className="w-full h-9 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all"
+                className="w-full h-9 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 text-rose-400 rounded-xl font-bold text-xs flex items-center justify-center gap-2"
               >
                 <Trash2 size={13} />
                 Dar de Baja / Eliminar Socio
               </button>
             </div>
-
-            <div className="pt-4 border-t border-border-dark space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <FileText size={12} className="text-brand-red" />
-                  Documentación Svadhisthana
-                </span>
-              </div>
-
-              <label
-                onClick={() => setIncludeAuditHistory(!includeAuditHistory)}
-                className="flex items-center justify-between p-2 rounded-xl bg-brand-dark/50 border border-border-dark hover:border-gray-700 cursor-pointer select-none transition-all"
-              >
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={13} className={includeAuditHistory ? "text-emerald-400" : "text-gray-500"} />
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-semibold text-gray-300">Historial de Auditoría</span>
-                    <span className="text-[9px] text-gray-500">Agente y fecha de alta</span>
-                  </div>
-                </div>
-                <div className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${includeAuditHistory ? 'bg-brand-red text-white' : 'border border-gray-600 bg-transparent'
-                  }`}>
-                  {includeAuditHistory && <Check size={11} />}
-                </div>
-              </label>
-            </div>
           </div>
 
-          <div className="space-y-2 pt-4 border-t border-border-dark mt-4">
+          <div className="space-y-2 pt-3 border-t border-border-dark">
             <button
               type="button"
               onClick={handleDownloadPDF}
-              className="w-full h-10 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-red/20 glow-border transition-all"
+              className="w-full h-10 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 shadow-lg"
             >
-              <Download size={14} /> Imprimir Ficha de Alta B&W (Firma)
+              <Download size={14} /> Imprimir Ficha B&W
             </button>
 
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={handleCopyDetails}
-                className="h-8 bg-gray-900 border border-border-dark hover:border-brand-red hover:text-white rounded-xl text-gray-300 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all"
+                className="h-8 bg-gray-900 border border-border-dark text-gray-300 rounded-xl font-semibold text-xs flex items-center justify-center gap-1"
               >
                 {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
                 {copied ? 'Copiado' : 'Copiar'}
@@ -1071,13 +833,14 @@ export default function SocioTemplate({
               <button
                 type="button"
                 onClick={handleExportCSV}
-                className="h-8 bg-gray-900 border border-border-dark hover:border-brand-red hover:text-white rounded-xl text-gray-300 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all"
+                className="h-8 bg-gray-900 border border-border-dark text-gray-300 rounded-xl font-semibold text-xs flex items-center justify-center gap-1"
               >
                 <Download size={12} /> CSV
               </button>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );

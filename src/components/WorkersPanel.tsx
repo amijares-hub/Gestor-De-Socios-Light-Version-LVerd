@@ -210,26 +210,26 @@ export default function WorkersPanel({
   const safeAppName = editAppName || appName || 'SVADHISTHANA';
 
   return (
-    <div id="admin-workers-panel" className="bg-panel-dark border border-border-dark rounded-3xl p-6 flex flex-col h-full relative">
+    <div id="admin-workers-panel" className="bg-panel-dark border border-border-dark rounded-3xl p-4 sm:p-6 flex flex-col h-full relative">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-dark/60 pb-5 mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-brand-red/10 border border-brand-red/20 flex items-center justify-center text-brand-red">
+          <div className="w-10 h-10 rounded-xl bg-brand-red/10 border border-brand-red/20 flex items-center justify-center text-brand-red shrink-0">
             <Shield size={20} />
           </div>
           <div>
             <h4 className="text-sm font-display font-bold text-gray-200 uppercase tracking-wider">
-              Consola de Administración {safeAppName}
+              Consola {safeAppName}
             </h4>
             <p className="text-xs text-gray-400 mt-0.5">
-              Personaliza el App, gestiona usuarios, contraseñas, accesos y permisos
+              Personalización, usuarios y accesos
             </p>
           </div>
         </div>
 
-        <div className="flex p-1 bg-brand-dark rounded-xl border border-border-dark self-start sm:self-center">
+        <div className="flex p-1 bg-brand-dark rounded-xl border border-border-dark self-stretch sm:self-center overflow-x-auto">
           <button 
             onClick={() => setActiveTab('workers')}
-            className={`px-4 h-8 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 ${
+            className={`flex-1 sm:flex-none px-3 sm:px-4 h-8 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
               activeTab === 'workers' ? 'bg-panel-dark text-white shadow border border-border-dark' : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -238,182 +238,295 @@ export default function WorkersPanel({
 
           <button 
             onClick={() => setActiveTab('settings')}
-            className={`px-4 h-8 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 ${
+            className={`flex-1 sm:flex-none px-3 sm:px-4 h-8 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
               activeTab === 'settings' ? 'bg-panel-dark text-white shadow border border-border-dark' : 'text-gray-400 hover:text-white'
             }`}
           >
-            <Sparkles size={13} className="text-amber-400" /> Branding del App
+            <Sparkles size={13} className="text-amber-400" /> Branding
           </button>
 
           <button 
             onClick={() => setActiveTab('logs')}
-            className={`px-4 h-8 text-xs font-semibold rounded-lg transition-all flex items-center gap-2 ${
+            className={`flex-1 sm:flex-none px-3 sm:px-4 h-8 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
               activeTab === 'logs' ? 'bg-panel-dark text-white shadow border border-border-dark' : 'text-gray-400 hover:text-white'
             }`}
           >
-            <History size={13} /> Auditoría ({logs.length})
+            <History size={13} /> Auditoría
           </button>
         </div>
       </div>
 
       {activeTab === 'workers' && (
-        <div className="flex-1 flex flex-col overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[720px]">
-            <thead>
-              <tr className="border-b border-border-dark font-mono text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                <th className="pb-3 pl-2">Personal / Usuario</th>
-                <th className="pb-3">Rol</th>
-                <th className="pb-3">Estado Acceso</th>
-                <th className="pb-3 text-center">Permisos</th>
-                <th className="pb-3 text-right pr-2">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-dark/40 text-xs">
-              {workers.map(worker => {
-                const isSelf = worker.id === adminWorker.id;
-                const isEditingPermissions = editingPermissionsId === worker.id;
+        <div className="flex-1 flex flex-col space-y-3">
+          
+          {/* VISTA MÓVIL: Tarjetas de Trabajadores (< md) */}
+          <div className="md:hidden space-y-3">
+            {workers.map(worker => {
+              const isSelf = worker.id === adminWorker.id;
+              const isEditingPermissions = editingPermissionsId === worker.id;
 
-                return (
-                  <tr key={worker.id} className="hover:bg-brand-dark/25 transition-colors group">
-                    <td className="py-3.5 pl-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-gray-900 border border-border-dark flex items-center justify-center text-gray-400 font-semibold uppercase">
-                          {worker.name ? worker.name[0] : 'U'}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-semibold text-gray-200">{worker.name}</p>
-                            {isSelf && <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded font-mono">(Tú)</span>}
-                          </div>
-                          <p className="text-[10px] text-gray-500 mt-0.5">{worker.email}</p>
-                        </div>
+              return (
+                <div key={worker.id} className="bg-brand-dark border border-border-dark rounded-2xl p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-gray-900 border border-border-dark flex items-center justify-center text-gray-300 font-bold text-xs uppercase">
+                        {worker.name ? worker.name[0] : 'U'}
                       </div>
-                    </td>
+                      <div>
+                        <div className="flex items-center gap-1">
+                          <p className="font-bold text-white text-xs">{worker.name}</p>
+                          {isSelf && <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1 py-0.2 rounded font-mono">(Tú)</span>}
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-mono mt-0.5">{worker.email}</p>
+                      </div>
+                    </div>
 
-                    <td className="py-3.5">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setSelectedWorkerForName(worker);
+                          setNewName(worker.name);
+                          setNameMessage(null);
+                        }}
+                        className="p-1.5 rounded-lg bg-panel-dark text-emerald-400 border border-border-dark"
+                      >
+                        <Edit3 size={13} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedWorkerForPass(worker);
+                          setNewPassword('');
+                          setPassMessage(null);
+                        }}
+                        className="p-1.5 rounded-lg bg-panel-dark text-amber-400 border border-border-dark"
+                      >
+                        <KeyRound size={13} />
+                      </button>
                       <button 
                         disabled={isSelf}
-                        onClick={() => handleRoleToggle(worker)}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase border transition-all ${
-                          worker.role === 'admin' 
-                            ? 'bg-brand-red/10 border-brand-red/25 text-brand-red hover:bg-brand-red/20' 
-                            : 'bg-gray-900 border-border-dark text-gray-400 hover:border-gray-600'
-                        }`}
+                        onClick={() => onDeleteWorker(worker.id)}
+                        className={`p-1.5 rounded-lg border border-border-dark ${isSelf ? 'text-gray-700' : 'text-rose-400 bg-panel-dark'}`}
                       >
-                        {worker.role}
+                        <Trash2 size={13} />
                       </button>
-                    </td>
+                    </div>
+                  </div>
 
-                    <td className="py-3.5">
-                      <button 
-                        disabled={isSelf}
-                        onClick={() => handleActiveToggle(worker)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase border transition-all ${
-                          worker.active 
-                            ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/20' 
-                            : 'bg-rose-500/10 border-rose-500/25 text-rose-400 hover:bg-rose-500/20 animate-pulse'
-                        }`}
-                      >
-                        {worker.active ? (
-                          <>
-                            <CheckCircle2 size={12} /> ACTIVO
-                          </>
-                        ) : (
-                          <>
-                            <XCircle size={12} /> PENDIENTE
-                          </>
-                        )}
-                      </button>
-                    </td>
+                  <div className="flex items-center justify-between pt-2 border-t border-border-dark/60 text-xs">
+                    <button 
+                      disabled={isSelf}
+                      onClick={() => handleRoleToggle(worker)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                        worker.role === 'admin' ? 'bg-brand-red/10 border-brand-red/25 text-brand-red' : 'bg-gray-900 border-border-dark text-gray-400'
+                      }`}
+                    >
+                      {worker.role}
+                    </button>
 
-                    <td className="py-3.5 text-center">
-                      {isEditingPermissions ? (
-                        <div className="inline-flex flex-wrap gap-1 max-w-[280px] p-2 bg-black/40 border border-border-dark rounded-xl text-[10px]">
-                          {availablePermissions.map(p => {
-                            const hasPerm = worker.permissions?.includes(p.key);
-                            return (
-                              <button
-                                key={p.key}
-                                onClick={() => handlePermissionToggle(worker, p.key)}
-                                className={`px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-all ${
-                                  hasPerm 
-                                    ? 'bg-brand-red/20 text-brand-red border border-brand-red/35' 
-                                    : 'bg-gray-900 text-gray-500 border border-transparent hover:border-gray-700'
-                                }`}
-                              >
-                                {hasPerm && <Check size={8} />} {p.label}
-                              </button>
-                            );
-                          })}
-                          <button 
-                            onClick={() => setEditingPermissionsId(null)}
-                            className="px-2 py-0.5 bg-gray-800 text-white font-bold rounded"
+                    <button 
+                      disabled={isSelf}
+                      onClick={() => handleActiveToggle(worker)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border flex items-center gap-1 ${
+                        worker.active ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' : 'bg-rose-500/10 border-rose-500/25 text-rose-400'
+                      }`}
+                    >
+                      {worker.active ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                      {worker.active ? 'ACTIVO' : 'PENDIENTE'}
+                    </button>
+
+                    <button 
+                      disabled={isSelf}
+                      onClick={() => setEditingPermissionsId(isEditingPermissions ? null : worker.id)}
+                      className="px-2 py-0.5 bg-panel-dark border border-border-dark text-gray-300 rounded text-[10px] font-semibold flex items-center gap-1"
+                    >
+                      <Sliders size={10} /> {worker.permissions?.length || 0} Permisos
+                    </button>
+                  </div>
+
+                  {isEditingPermissions && (
+                    <div className="pt-2 border-t border-border-dark flex flex-wrap gap-1 bg-black/40 p-2 rounded-xl">
+                      {availablePermissions.map(p => {
+                        const hasPerm = worker.permissions?.includes(p.key);
+                        return (
+                          <button
+                            key={p.key}
+                            onClick={() => handlePermissionToggle(worker, p.key)}
+                            className={`px-2 py-1 rounded text-[10px] font-medium flex items-center gap-1 ${
+                              hasPerm ? 'bg-brand-red/20 text-brand-red border border-brand-red/35' : 'bg-gray-900 text-gray-500'
+                            }`}
                           >
-                            Listo
+                            {hasPerm && <Check size={8} />} {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* VISTA ESCRITORIO: Tabla Completa (>= md) */}
+          <div className="hidden md:block flex-1 overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[720px]">
+              <thead>
+                <tr className="border-b border-border-dark font-mono text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                  <th className="pb-3 pl-2">Personal / Usuario</th>
+                  <th className="pb-3">Rol</th>
+                  <th className="pb-3">Estado Acceso</th>
+                  <th className="pb-3 text-center">Permisos</th>
+                  <th className="pb-3 text-right pr-2">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-dark/40 text-xs">
+                {workers.map(worker => {
+                  const isSelf = worker.id === adminWorker.id;
+                  const isEditingPermissions = editingPermissionsId === worker.id;
+
+                  return (
+                    <tr key={worker.id} className="hover:bg-brand-dark/25 transition-colors group">
+                      <td className="py-3.5 pl-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-gray-900 border border-border-dark flex items-center justify-center text-gray-400 font-semibold uppercase">
+                            {worker.name ? worker.name[0] : 'U'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-semibold text-gray-200">{worker.name}</p>
+                              {isSelf && <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded font-mono">(Tú)</span>}
+                            </div>
+                            <p className="text-[10px] text-gray-500 mt-0.5">{worker.email}</p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-3.5">
+                        <button 
+                          disabled={isSelf}
+                          onClick={() => handleRoleToggle(worker)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase border transition-all ${
+                            worker.role === 'admin' 
+                              ? 'bg-brand-red/10 border-brand-red/25 text-brand-red hover:bg-brand-red/20' 
+                              : 'bg-gray-900 border-border-dark text-gray-400 hover:border-gray-600'
+                          }`}
+                        >
+                          {worker.role}
+                        </button>
+                      </td>
+
+                      <td className="py-3.5">
+                        <button 
+                          disabled={isSelf}
+                          onClick={() => handleActiveToggle(worker)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase border transition-all ${
+                            worker.active 
+                              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/20' 
+                              : 'bg-rose-500/10 border-rose-500/25 text-rose-400 hover:bg-rose-500/20 animate-pulse'
+                          }`}
+                        >
+                          {worker.active ? (
+                            <>
+                              <CheckCircle2 size={12} /> ACTIVO
+                            </>
+                          ) : (
+                            <>
+                              <XCircle size={12} /> PENDIENTE
+                            </>
+                          )}
+                        </button>
+                      </td>
+
+                      <td className="py-3.5 text-center">
+                        {isEditingPermissions ? (
+                          <div className="inline-flex flex-wrap gap-1 max-w-[280px] p-2 bg-black/40 border border-border-dark rounded-xl text-[10px]">
+                            {availablePermissions.map(p => {
+                              const hasPerm = worker.permissions?.includes(p.key);
+                              return (
+                                <button
+                                  key={p.key}
+                                  onClick={() => handlePermissionToggle(worker, p.key)}
+                                  className={`px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-all ${
+                                    hasPerm 
+                                      ? 'bg-brand-red/20 text-brand-red border border-brand-red/35' 
+                                      : 'bg-gray-900 text-gray-500 border border-transparent hover:border-gray-700'
+                                  }`}
+                                >
+                                  {hasPerm && <Check size={8} />} {p.label}
+                                </button>
+                              );
+                            })}
+                            <button 
+                              onClick={() => setEditingPermissionsId(null)}
+                              className="px-2 py-0.5 bg-gray-800 text-white font-bold rounded"
+                            >
+                              Listo
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            disabled={isSelf}
+                            onClick={() => setEditingPermissionsId(worker.id)}
+                            className="px-3 py-1 bg-gray-900 hover:bg-brand-dark text-gray-300 font-semibold border border-border-dark rounded-lg flex items-center gap-1.5 mx-auto transition-all text-[11px]"
+                          >
+                            <Sliders size={11} /> {worker.permissions?.length || 0} Permisos
+                          </button>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 text-right pr-2">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => {
+                              setSelectedWorkerForName(worker);
+                              setNewName(worker.name);
+                              setNameMessage(null);
+                            }}
+                            className="p-1.5 rounded-lg bg-brand-dark hover:bg-gray-800 text-emerald-400 hover:text-emerald-300 border border-border-dark transition-all"
+                            title="Editar Nombre de Usuario"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setSelectedWorkerForPass(worker);
+                              setNewPassword('');
+                              setPassMessage(null);
+                            }}
+                            className="p-1.5 rounded-lg bg-brand-dark hover:bg-gray-800 text-amber-400 hover:text-amber-300 border border-border-dark transition-all"
+                            title="Cambiar contraseña de este usuario"
+                          >
+                            <KeyRound size={14} />
+                          </button>
+
+                          <button 
+                            disabled={isSelf}
+                            onClick={() => onDeleteWorker(worker.id)}
+                            className={`p-1.5 rounded-lg border border-transparent transition-all ${
+                              isSelf 
+                                ? 'text-gray-700 cursor-not-allowed' 
+                                : 'text-gray-400 hover:text-brand-red hover:bg-brand-red/10 hover:border-brand-red/20'
+                            }`}
+                            title="Eliminar trabajador"
+                          >
+                            <Trash2 size={14} />
                           </button>
                         </div>
-                      ) : (
-                        <button 
-                          disabled={isSelf}
-                          onClick={() => setEditingPermissionsId(worker.id)}
-                          className="px-3 py-1 bg-gray-900 hover:bg-brand-dark text-gray-300 font-semibold border border-border-dark rounded-lg flex items-center gap-1.5 mx-auto transition-all text-[11px]"
-                        >
-                          <Sliders size={11} /> {worker.permissions?.length || 0} Permisos
-                        </button>
-                      )}
-                    </td>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-                    <td className="py-3.5 text-right pr-2">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => {
-                            setSelectedWorkerForName(worker);
-                            setNewName(worker.name);
-                            setNameMessage(null);
-                          }}
-                          className="p-1.5 rounded-lg bg-brand-dark hover:bg-gray-800 text-emerald-400 hover:text-emerald-300 border border-border-dark transition-all"
-                          title="Editar Nombre de Usuario"
-                        >
-                          <Edit3 size={14} />
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setSelectedWorkerForPass(worker);
-                            setNewPassword('');
-                            setPassMessage(null);
-                          }}
-                          className="p-1.5 rounded-lg bg-brand-dark hover:bg-gray-800 text-amber-400 hover:text-amber-300 border border-border-dark transition-all"
-                          title="Cambiar contraseña de este usuario"
-                        >
-                          <KeyRound size={14} />
-                        </button>
-
-                        <button 
-                          disabled={isSelf}
-                          onClick={() => onDeleteWorker(worker.id)}
-                          className={`p-1.5 rounded-lg border border-transparent transition-all ${
-                            isSelf 
-                              ? 'text-gray-700 cursor-not-allowed' 
-                              : 'text-gray-400 hover:text-brand-red hover:bg-brand-red/10 hover:border-brand-red/20'
-                          }`}
-                          title="Eliminar trabajador"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
         </div>
       )}
 
+      {/* BRANDING DEL APP */}
       {activeTab === 'settings' && (
         <form onSubmit={handleSaveAppSettings} className="max-w-xl mx-auto w-full space-y-6 py-2 text-xs">
-          <div className="bg-brand-dark p-5 border border-border-dark rounded-2xl space-y-4">
+          <div className="bg-brand-dark p-4 sm:p-5 border border-border-dark rounded-2xl space-y-4">
             <h4 className="text-sm font-bold text-white uppercase flex items-center gap-2">
               <Sparkles size={16} className="text-amber-400" /> Personalización Visual de la Aplicación
             </h4>
@@ -447,7 +560,7 @@ export default function WorkersPanel({
                 Logo / Avatar Oficial
               </label>
               
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div className="w-16 h-16 rounded-2xl bg-emerald-600 border border-emerald-400/50 flex items-center justify-center text-white font-black text-xl overflow-hidden shrink-0 shadow-lg">
                   {editAppLogo ? (
                     <img src={editAppLogo} alt="Logo App" className="w-full h-full object-cover" />
@@ -474,7 +587,7 @@ export default function WorkersPanel({
                       onClick={() => setEditAppLogo(null)}
                       className="block text-[10px] text-rose-400 hover:underline font-bold"
                     >
-                      Quitar logo (Usar iniciales por defecto)
+                      Quitar logo
                     </button>
                   )}
                 </div>
@@ -493,6 +606,7 @@ export default function WorkersPanel({
         </form>
       )}
 
+      {/* AUDITORÍA */}
       {activeTab === 'logs' && (
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-4">
