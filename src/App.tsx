@@ -137,6 +137,10 @@ export default function App() {
     fetchAppSettings();
   }, []);
 
+  useEffect(() => {
+    document.title = `${appName} - Panel Oficial`;
+  }, [appName]);
+
   const handleUpdateAppSettings = async (newName: string, newLogo: string | null) => {
     const { error } = await supabase
       .from('app_settings')
