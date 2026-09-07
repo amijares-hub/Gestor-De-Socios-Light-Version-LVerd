@@ -136,7 +136,7 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
   doc.setFontSize(6.5);
   doc.text(doc.splitTextToSize('La persona solicitante declara haber tenido a su disposición los Estatutos y el Reglamento de Régimen Interno vigentes en la fecha de su admisión y aceptar las obligaciones derivadas.', 176), 18, y + 8);
 
-  // 7. PROTECCIÓN DE DATOS PERSONALES
+  // 7. PROTECCIÓN DE DATOS PERSONALES (VERSIÓN EXTENDIDA)
   y = 171;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
@@ -146,12 +146,12 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
   doc.text('7. PROTECCIÓN DE DATOS PERSONALES', 18, y + 3.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6);
-  const lopdText = 'Responsable: Asociación Cannábica Svadhisthana. Finalidad: gestionar la solicitud de admisión, la relación asociativa y el registro de socios. Derechos: acceso, rectificación, supresión, oposición, limitación dirigiéndose por escrito a la Asociación.';
+  doc.setFontSize(5.5);
+  const lopdText = 'Responsable: Asociación Cannábica Svadhisthana. Finalidad: gestionar la solicitud de admisión, la relación asociativa y el registro de socios/as, así como el cumplimiento de las obligaciones legales y estatutarias de la Asociación. Base jurídica: la gestión de la relación asociativa y el cumplimiento de las obligaciones legales aplicables. Destinatarios: los datos no serán comunicados a terceros, salvo obligación legal o requerimiento de autoridad competente. Conservación: los datos se conservarán mientras permanezca vigente la relación asociativa y, posteriormente, durante los plazos necesarios para atender las obligaciones y posibles responsabilidades legales. Derechos: la persona interesada podrá ejercer sus derechos de acceso, rectificación, supresión, oposición, limitación del tratamiento y, cuando proceda, portabilidad, mediante solicitud dirigida a Svadhisthana.aso.can@gmail.com.';
   doc.text(doc.splitTextToSize(lopdText, 176), 18, y + 7.5);
 
   // 8. ACEPTACIÓN Y FIRMA DE LA PERSONA SOCIA
-  y = 186;
+  y = 188;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setFillColor(lightGray);
@@ -163,10 +163,10 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
   doc.setFontSize(7.5);
   doc.text(`Lugar: San Cristóbal de La Laguna      Fecha: ${reqDate}`, 18, y + 9);
   doc.text('Firma de la persona solicitante:', 18, y + 15);
-  doc.rect(18, y + 17, 75, 18);
+  doc.rect(18, y + 17, 75, 17);
 
-  // 9. USO INTERNO DE LA ASOCIACIÓN (Posicionamiento Corregido Sin Solapamiento)
-  y = 227;
+  // 9. USO INTERNO DE LA ASOCIACIÓN
+  y = 228;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setFillColor(lightGray);
@@ -177,14 +177,14 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
 
-  // Columna Izquierda (x=18)
+  // Columna Izquierda
   doc.text('Identidad comprobada: [X] Sí   [ ] No', 18, y + 10);
   doc.text('Mayoría de edad comprobada: [X] Sí   [ ] No', 18, y + 16);
   doc.text(`Fecha efectiva de admisión: ${reqDate}`, 18, y + 22);
 
-  // Columna Derecha (x=115) - Firma Junta / Sello
+  // Columna Derecha - Firma Junta / Sello
   doc.text('Firma Junta Directiva / Sello:', 115, y + 10);
-  doc.rect(115, y + 12, 65, 18);
+  doc.rect(115, y + 12, 65, 17);
 
   // Pie de página
   doc.setFontSize(6);
