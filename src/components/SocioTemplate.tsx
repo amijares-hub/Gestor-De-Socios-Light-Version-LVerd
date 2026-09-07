@@ -1,17 +1,11 @@
-import React, { useState } from 'react';
-import { jsPDF } from 'jspdf';
-import { 
-  FileText, 
-  Download, 
-  Printer, 
-  User, 
-  Calendar, 
-  CreditCard, 
-  Globe, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  CheckCircle, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  FileText,
+  Download,
+  Mail,
+  Phone,
+  MapPin,
+  CheckCircle,
   X,
   Copy,
   Check,
@@ -21,44 +15,53 @@ import {
   Trash2,
   Save,
   AlertTriangle,
-  RotateCcw,
-  Sparkles,
   History,
   Clock,
   ArrowRight,
+  Upload,
+  FileCheck,
+  Eye,
   RefreshCw
 } from 'lucide-react';
 import { AssociationMember, WorkerUser, DocumentType, ActivityLog } from '../types';
 import ConfirmModal from './ConfirmModal';
+import DniPhotoCapture from './DniPhotoCapture';
+import { generateSvadhisthanaAltaPdf } from '../utils/pdfGenerator';
+import { supabase } from '../supabaseClient';
 
 export interface SocioTemplateProps {
-  member: AssociationMember;
+  member: AssociationMember & { 
+    dniFrontImage?: string; 
+    dniBackImage?: string; 
+    dni_front_image?: string; 
+    dni_back_image?: string;
+    signedPdf?: string | null;
+    signed_pdf?: string | null;
+  };
   onClose: () => void;
   onUpdateMember?: (updated: AssociationMember) => Promise<boolean | void> | boolean | void;
   onDeleteMember?: (id: string) => Promise<boolean | void> | boolean | void;
   currentWorker?: WorkerUser | null;
 }
 
-export default function SocioTemplate({ 
-  member, 
-  onClose, 
-  onUpdateMember, 
-  onDeleteMember, 
-  currentWorker 
+export default function SocioTemplate({
+  member,
+  onClose,
+  onUpdateMember,
+  onDeleteMember,
+  currentWorker
 }: SocioTemplateProps) {
-  const [currentMember, setCurrentMember] = useState<AssociationMember>(member);
+  const [currentMember, setCurrentMember] = useState(member);
   const [copied, setCopied] = useState(false);
-  const [pageSize, setPageSize] = useState<'a4' | 'id_card'>('a4');
   const [includeAuditHistory, setIncludeAuditHistory] = useState<boolean>(true);
 
-  // Active View Tab: 'badge' | 'edit' | 'audit'
   const [activeTab, setActiveTab] = useState<'badge' | 'edit' | 'audit'>('badge');
-
-  // Audit Logs State
   const [auditLogs, setAuditLogs] = useState<ActivityLog[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
 
-  // Edit Mode State
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+
   const [editFirstName, setEditFirstName] = useState(member.firstName);
   const [editLastName, setEditLastName] = useState(member.lastName);
   const [editDocType, setEditDocType] = useState<DocumentType>(member.documentType || 'DNI');
@@ -72,15 +75,20 @@ export default function SocioTemplate({
   const [editPhone, setEditPhone] = useState(member.phone || '');
   const [editAddress, setEditAddress] = useState(member.address || '');
 
+  const [editDniFront, setEditDniFront] = useState<string | null>(
+    member.dniFrontImage || member.dni_front_image || null
+  );
+  const [editDniBack, setEditDniBack] = useState<string | null>(
+    member.dniBackImage || member.dni_back_image || null
+  );
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Delete State
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Fetch audit logs for this specific member
   const fetchAuditLogs = async () => {
     try {
       setIsLoadingLogs(true);
@@ -96,7 +104,7 @@ export default function SocioTemplate({
         }
       }
     } catch (err) {
-      console.error("Error fetching audit logs for member:", err);
+      console.error("Error obteniendo logs de auditoría:", err);
     } finally {
       setIsLoadingLogs(false);
     }
@@ -106,7 +114,6 @@ export default function SocioTemplate({
     fetchAuditLogs();
   }, [currentMember.id]);
 
-  // Sync edit form if member prop changes
   const resetEditForm = () => {
     setEditFirstName(currentMember.firstName);
     setEditLastName(currentMember.lastName);
@@ -120,11 +127,12 @@ export default function SocioTemplate({
     setEditEmail(currentMember.email || '');
     setEditPhone(currentMember.phone || '');
     setEditAddress(currentMember.address || '');
+    setEditDniFront(currentMember.dniFrontImage || currentMember.dni_front_image || null);
+    setEditDniBack(currentMember.dniBackImage || currentMember.dni_back_image || null);
     setSaveError(null);
     setSaveSuccess(null);
   };
 
-  // Save changes
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFirstName.trim() || !editLastName.trim() || !editDniPassport.trim()) {
@@ -136,7 +144,7 @@ export default function SocioTemplate({
     setSaveError(null);
     setSaveSuccess(null);
 
-    const updatedData: AssociationMember = {
+    const updatedData: AssociationMember & { dniFrontImage?: string | null; dniBackImage?: string | null; dni_front_image?: string | null; dni_back_image?: string | null } = {
       ...currentMember,
       firstName: editFirstName.trim().toUpperCase(),
       lastName: editLastName.trim().toUpperCase(),
@@ -150,30 +158,40 @@ export default function SocioTemplate({
       email: editEmail.trim(),
       phone: editPhone.trim(),
       address: editAddress.trim(),
+      dniFrontImage: editDniFront,
+      dniBackImage: editDniBack,
+      dni_front_image: editDniFront,
+      dni_back_image: editDniBack
     };
 
     try {
-      const res = await fetch(`/api/members/${currentMember.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          memberData: updatedData,
-          worker: currentWorker
+      const { error } = await supabase
+        .from('members')
+        .update({
+          first_name: updatedData.firstName,
+          last_name: updatedData.lastName,
+          dni_passport: updatedData.dniPassport,
+          document_type: updatedData.documentType,
+          nationality: updatedData.nationality,
+          birth_date: updatedData.birthDate || null,
+          expiry_date: updatedData.expiryDate || null,
+          email: updatedData.email || null,
+          phone: updatedData.phone || null,
+          address: updatedData.address || null,
+          gender: updatedData.gender,
+          registration_status: updatedData.registrationStatus,
+          dni_front_image: editDniFront,
+          dni_back_image: editDniBack
         })
-      });
+        .eq('id', currentMember.id);
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Error al guardar los cambios');
-      }
+      if (error) throw error;
 
-      const saved: AssociationMember = await res.json();
-      setCurrentMember(saved);
       if (onUpdateMember) {
-        await onUpdateMember(saved);
+        await onUpdateMember(updatedData);
       }
-      setSaveSuccess("¡Ficha actualizada exitosamente en la base de datos!");
-      // Immediately refresh audit trail
+      setCurrentMember(updatedData);
+      setSaveSuccess("¡Ficha y fotografías actualizadas exitosamente!");
       await fetchAuditLogs();
       setTimeout(() => {
         setActiveTab('badge');
@@ -186,19 +204,9 @@ export default function SocioTemplate({
     }
   };
 
-  // Delete Member
   const handleDeleteMember = async () => {
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/members/${currentMember.id}?worker=${encodeURIComponent(JSON.stringify(currentWorker))}`, {
-        method: 'DELETE'
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Error al eliminar el socio');
-      }
-
       if (onDeleteMember) {
         await onDeleteMember(currentMember.id);
       }
@@ -211,318 +219,55 @@ export default function SocioTemplate({
     }
   };
 
-  // Download high-end PDF using jsPDF (A4 or ID Card / Carnet CR-80)
   const handleDownloadPDF = () => {
-    const colorRed = [220, 38, 38];
-    const colorDark = [18, 18, 24];
-    const colorGray = [100, 116, 139];
+    const doc = generateSvadhisthanaAltaPdf(currentMember);
+    doc.save(`Alta_Socio_${currentMember.dniPassport}_Svadhisthana.pdf`);
+  };
 
-    if (pageSize === 'id_card') {
-      const doc = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: [85.6, 54]
-      });
+  const handleUploadSignedPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
 
-      doc.setFillColor(18, 18, 24);
-      doc.rect(0, 0, 85.6, 54, 'F');
-
-      doc.setFillColor(colorRed[0], colorRed[1], colorRed[2]);
-      doc.rect(0, 0, 85.6, 2, 'F');
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.text('LAGUNA VERDE', 5, 6);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(4.5);
-      doc.setTextColor(180, 180, 190);
-      doc.text('CARNET OFICIAL DE SOCIO', 5, 8.5);
-
-      const isApproved = currentMember.registrationStatus === 'approved';
-      doc.setFillColor(isApproved ? 16 : 217, isApproved ? 185 : 119, isApproved ? 129 : 6);
-      doc.roundedRect(60, 4, 20.6, 4.5, 1, 1, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(4.5);
-      doc.text(currentMember.registrationStatus.toUpperCase(), 70.3, 7.2, { align: 'center' });
-
-      doc.setDrawColor(60, 60, 75);
-      doc.setFillColor(28, 28, 36);
-      doc.roundedRect(5, 12, 22, 28, 1.5, 1.5, 'FD');
-
-      doc.setFillColor(45, 45, 55);
-      doc.circle(16, 22, 5, 'F');
-      doc.roundedRect(10, 27, 12, 10, 2, 2, 'F');
-
-      doc.setTextColor(140, 140, 160);
-      doc.setFontSize(3.5);
-      doc.text('FOTO IDENTIFICATIVA', 16, 38.5, { align: 'center' });
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(4);
-      doc.setTextColor(150, 150, 165);
-      doc.text('APELLIDOS / SURNAME', 30, 14);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.5);
-      doc.setTextColor(255, 255, 255);
-      doc.text(currentMember.lastName.toUpperCase(), 30, 17);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(4);
-      doc.setTextColor(150, 150, 165);
-      doc.text('NOMBRE / GIVEN NAME', 30, 21.5);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6);
-      doc.setTextColor(255, 255, 255);
-      doc.text(currentMember.firstName.toUpperCase(), 30, 24.5);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(4);
-      doc.setTextColor(150, 150, 165);
-      doc.text(`${currentMember.documentType} / DOC ID`, 30, 29);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(5.5);
-      doc.setTextColor(220, 38, 38);
-      doc.text(currentMember.dniPassport.toUpperCase(), 30, 32);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(4);
-      doc.setTextColor(150, 150, 165);
-      doc.text('NACIONALIDAD', 56, 29);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(5.5);
-      doc.setTextColor(255, 255, 255);
-      doc.text((currentMember.nationality || 'ESPAÑA').toUpperCase(), 56, 32);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(4);
-      doc.setTextColor(150, 150, 165);
-      doc.text('FECHA NACIMIENTO', 30, 36.5);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(5.2);
-      doc.setTextColor(255, 255, 255);
-      doc.text(currentMember.birthDate || 'N/D', 30, 39.5);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(4);
-      doc.setTextColor(150, 150, 165);
-      doc.text('VALIDEZ / EXPIRY', 56, 36.5);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(5.2);
-      doc.setTextColor(255, 255, 255);
-      doc.text(currentMember.expiryDate || 'PERMANENTE', 56, 39.5);
-
-      doc.setDrawColor(45, 45, 55);
-      doc.line(5, 43.5, 80.6, 43.5);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(4);
-      doc.setTextColor(180, 180, 190);
-      doc.text(`ID SOCIO: #${currentMember.id.toUpperCase()}`, 5, 47);
-
-      if (includeAuditHistory) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(3.5);
-        doc.setTextColor(120, 120, 135);
-        doc.text(`ALTA: ${new Date(currentMember.registerDate).toLocaleDateString()} | AGENTE: ${currentMember.registeredBy.name.toUpperCase()}`, 5, 50.5);
-      }
-
-      doc.setFillColor(255, 255, 255);
-      const codeStart = 66;
-      for (let i = 0; i < 28; i++) {
-        const barWidth = (i % 3 === 0) ? 0.6 : 0.3;
-        doc.rect(codeStart + (i * 0.5), 45, barWidth, 4.5, 'F');
-      }
-
-      doc.save(`carnet_socio_${currentMember.dniPassport}_${currentMember.lastName.toLowerCase()}.pdf`);
+    if (file.type !== 'application/pdf') {
+      alert('Por favor, selecciona un archivo en formato PDF.');
       return;
     }
 
-    // Default: A4 Standard Document
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
+    setIsUploadingPdf(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64Pdf = event.target?.result as string;
+      try {
+        const { error } = await supabase
+          .from('members')
+          .update({ signed_pdf: base64Pdf })
+          .eq('id', currentMember.id);
 
-    doc.setFillColor(colorDark[0], colorDark[1], colorDark[2]);
-    doc.rect(0, 0, 210, 297, 'F');
+        if (error) throw error;
 
-    doc.setFillColor(colorRed[0], colorRed[1], colorRed[2]);
-    doc.rect(0, 0, 210, 4, 'F');
+        const updated = { ...currentMember, signedPdf: base64Pdf, signed_pdf: base64Pdf };
+        setCurrentMember(updated);
+        if (onUpdateMember) onUpdateMember(updated);
+        alert('¡PDF firmado subido y guardado correctamente en la ficha del socio!');
+      } catch (err: any) {
+        alert('Error al guardar el PDF firmado: ' + err.message);
+      } finally {
+        setIsUploadingPdf(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text('LAGUNA VERDE ASOCIACIÓN', 20, 20);
+  const handleDownloadSignedPdf = () => {
+    const pdfData = currentMember.signedPdf || currentMember.signed_pdf;
+    if (!pdfData) return;
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text('SISTEMA INTEGRADO DE REGISTRO & CONTROL DOCUMENTAL', 20, 26);
-
-    const isApproved = currentMember.registrationStatus === 'approved';
-    doc.setFillColor(isApproved ? 16 : 217, isApproved ? 185 : 119, isApproved ? 129 : 6);
-    doc.roundedRect(145, 14, 45, 8, 2, 2, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text(currentMember.registrationStatus.toUpperCase(), 167.5, 19, { align: 'center' });
-
-    doc.setDrawColor(40, 40, 50);
-    doc.setLineWidth(0.5);
-    doc.line(20, 32, 190, 32);
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text('FICHA OFICIAL DE SOCIO REGISTRADO', 20, 42);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text(`Identificador de Sistema: #${currentMember.id.toUpperCase()}`, 20, 48);
-
-    doc.setDrawColor(50, 50, 60);
-    doc.setFillColor(24, 24, 32);
-    doc.roundedRect(20, 56, 170, 75, 4, 4, 'FD');
-
-    doc.setDrawColor(60, 60, 75);
-    doc.setFillColor(32, 32, 42);
-    doc.roundedRect(28, 64, 35, 45, 2, 2, 'FD');
-
-    doc.setFillColor(60, 60, 75);
-    doc.circle(45.5, 78, 8, 'F');
-    doc.roundedRect(35.5, 87, 20, 18, 3, 3, 'F');
-
-    doc.setTextColor(140, 140, 160);
-    doc.setFontSize(7);
-    doc.text('FOTO ESCANEO', 45.5, 104, { align: 'center' });
-
-    let startX = 72;
-    let startY = 68;
-    let colGap = 60;
-    let rowGap = 13;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text('APELLIDOS / SURNAME', startX, startY);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
-    doc.text(currentMember.lastName, startX, startY + 4.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text('NOMBRE / GIVEN NAME', startX + colGap, startY);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
-    doc.text(currentMember.firstName, startX + colGap, startY + 4.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text(`${currentMember.documentType} / DOCUMENT ID`, startX, startY + rowGap);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(colorRed[0], colorRed[1], colorRed[2]);
-    doc.text(currentMember.dniPassport, startX, startY + rowGap + 4.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text('NACIONALIDAD / NATIONALITY', startX + colGap, startY + rowGap);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
-    doc.text(currentMember.nationality || 'N/D', startX + colGap, startY + rowGap + 4.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text('FECHA DE NACIMIENTO', startX, startY + (rowGap * 2));
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(255, 255, 255);
-    doc.text(currentMember.birthDate || 'N/D', startX, startY + (rowGap * 2) + 4.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text('FECHA CADUCIDAD DOCUMENTO', startX + colGap, startY + (rowGap * 2));
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(255, 255, 255);
-    doc.text(currentMember.expiryDate || 'PERMANENTE', startX + colGap, startY + (rowGap * 2) + 4.5);
-
-    doc.setDrawColor(50, 50, 60);
-    doc.setFillColor(24, 24, 32);
-    doc.roundedRect(20, 137, 170, 48, 4, 4, 'FD');
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(colorRed[0], colorRed[1], colorRed[2]);
-    doc.text('INFORMACIÓN DE CONTACTO & LOCALIZACIÓN', 28, 147);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text('CORREO ELECTRÓNICO:', 28, 156);
-    doc.setTextColor(255, 255, 255);
-    doc.text(currentMember.email || 'No proporcionado', 70, 156);
-
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text('TELÉFONO DE CONTACTO:', 28, 165);
-    doc.setTextColor(255, 255, 255);
-    doc.text(currentMember.phone || 'No proporcionado', 70, 165);
-
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text('DIRECCIÓN RESIDENCIAL:', 28, 174);
-    doc.setTextColor(255, 255, 255);
-    doc.text(currentMember.address || 'No proporcionada', 70, 174);
-
-    if (includeAuditHistory) {
-      doc.setDrawColor(50, 50, 60);
-      doc.setFillColor(24, 24, 32);
-      doc.roundedRect(20, 191, 170, 48, 4, 4, 'FD');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(255, 255, 255);
-      doc.text('HISTORIAL DE AUDITORÍA & TRAZABILIDAD', 28, 201);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-      doc.text('FECHA OFICIAL DE ALTA:', 28, 210);
-      doc.setTextColor(255, 255, 255);
-      doc.text(new Date(currentMember.registerDate).toLocaleString(), 75, 210);
-
-      doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-      doc.text('AGENTE REGISTRADOR:', 28, 218);
-      doc.setTextColor(255, 255, 255);
-      doc.text(`${currentMember.registeredBy.name} (ID: ${currentMember.registeredBy.id})`, 75, 218);
-
-      doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-      doc.text('CANAL DE CAPTURA:', 28, 226);
-      doc.setTextColor(255, 255, 255);
-      doc.text('Escáner OCR Automatizado / Validación Facial', 75, 226);
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
-    doc.text('LAGUNA VERDE - GESTIÓN DOCUMENTAL Y ACCESO DIGITAL SEGURO', 105, 280, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.text(`Generado el ${new Date().toLocaleString()} por operador autorizado`, 105, 284, { align: 'center' });
-
-    doc.save(`ficha_socio_${currentMember.dniPassport}_${currentMember.lastName.toLowerCase()}.pdf`);
+    const link = document.createElement('a');
+    link.href = pdfData;
+    link.download = `Svadhisthana_Alta_Firmada_${currentMember.dniPassport}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleCopyDetails = () => {
@@ -534,7 +279,7 @@ export default function SocioTemplate({
 
   const handleExportCSV = () => {
     const headers = [
-      "ID", "Documento", "Tipo", "Nombre", "Apellidos", "Nacionalidad", 
+      "ID", "Documento", "Tipo", "Nombre", "Apellidos", "Nacionalidad",
       "Fecha Nacimiento", "Fecha Caducidad", "Email", "Telefono", "Direccion", "Estado", "Fecha Alta", "Registrador"
     ];
     const row = [
@@ -551,11 +296,11 @@ export default function SocioTemplate({
       currentMember.address,
       currentMember.registrationStatus,
       currentMember.registerDate,
-      currentMember.registeredBy.name
+      currentMember.registeredBy?.name || 'ADMIN'
     ];
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.map(h => `"${h}"`).join(','), row.map(r => `"${r.replace(/"/g, '""')}"`).join(',')].join('\n');
-    
+    const csvContent = "data:text/csv;charset=utf-8,"
+      + [headers.map(h => `"${h}"`).join(','), row.map(r => `"${(r || '').replace(/"/g, '""')}"`).join(',')].join('\n');
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -565,17 +310,19 @@ export default function SocioTemplate({
     document.body.removeChild(link);
   };
 
+  const frontImageDisplay = currentMember.dniFrontImage || currentMember.dni_front_image;
+  const backImageDisplay = currentMember.dniBackImage || currentMember.dni_back_image;
+  const signedPdfData = currentMember.signedPdf || currentMember.signed_pdf;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 bg-black/85 backdrop-blur-md no-print">
-      
-      {/* Reusable Confirmation Modal for Delete Action */}
       <ConfirmModal
         isOpen={confirmDelete}
         type="danger"
         title="¿Confirmar baja del socio?"
         message={
           <span>
-            Esta acción eliminará de forma permanente a <strong className="text-white font-bold">{currentMember.firstName} {currentMember.lastName}</strong> ({currentMember.dniPassport}) de la base de datos de la asociación Laguna Verde.
+            Esta acción eliminará de forma permanente a <strong className="text-white font-bold">{currentMember.firstName} {currentMember.lastName}</strong> ({currentMember.dniPassport}) de la base de datos de la asociación Cannábica Svadhisthana.
           </span>
         }
         confirmText="Sí, Eliminar Socio"
@@ -586,41 +333,34 @@ export default function SocioTemplate({
       />
 
       <div className="relative w-full max-w-4xl bg-panel-dark border border-border-dark rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row h-[92vh] md:h-auto max-h-[92vh]">
-        
-        {/* Close Button */}
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-4 right-4 z-20 p-2 text-gray-400 hover:text-white bg-gray-900/80 rounded-full border border-border-dark hover:border-brand-red transition-all"
         >
           <X size={18} />
         </button>
 
-        {/* LEFT COLUMN: Main content (View Certificate OR Edit Form OR Audit Log) */}
         <div className="flex-1 bg-brand-dark p-5 md:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-border-dark overflow-y-auto">
-          
-          {/* Top Toggle: Carnet vs Editar vs Auditoría */}
           <div className="flex items-center justify-between gap-3 mb-4 border-b border-border-dark pb-3">
             <div className="flex items-center gap-1.5 bg-panel-dark p-1 rounded-xl border border-border-dark flex-wrap">
               <button
                 type="button"
                 onClick={() => { setActiveTab('badge'); setSaveError(null); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                  activeTab === 'badge' 
-                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/20' 
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${activeTab === 'badge'
+                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/20'
                     : 'text-gray-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <IdCard size={13} />
-                Carnet Oficial
+                Ficha Socio
               </button>
               <button
                 type="button"
                 onClick={() => { setActiveTab('edit'); resetEditForm(); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                  activeTab === 'edit' 
-                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/20' 
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${activeTab === 'edit'
+                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/20'
                     : 'text-gray-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <Edit3 size={13} />
                 Editar Datos
@@ -628,18 +368,16 @@ export default function SocioTemplate({
               <button
                 type="button"
                 onClick={() => { setActiveTab('audit'); fetchAuditLogs(); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                  activeTab === 'audit' 
-                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/20' 
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${activeTab === 'audit'
+                    ? 'bg-brand-red text-white shadow-md shadow-brand-red/20'
                     : 'text-gray-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <History size={13} />
                 Auditoría
                 {auditLogs.length > 0 && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
-                    activeTab === 'audit' ? 'bg-white/20 text-white' : 'bg-emerald-950 text-emerald-400 border border-emerald-500/40'
-                  }`}>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${activeTab === 'audit' ? 'bg-white/20 text-white' : 'bg-emerald-950 text-emerald-400 border border-emerald-500/40'
+                    }`}>
                     {auditLogs.length}
                   </span>
                 )}
@@ -652,17 +390,15 @@ export default function SocioTemplate({
             </div>
           </div>
 
-          {/* MODE 1: EDIT FORM */}
           {activeTab === 'edit' && (
             <form onSubmit={handleSaveEdit} className="space-y-4">
-              
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-display font-bold text-white uppercase tracking-wider">
                     Modificar Información del Socio
                   </h3>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    Actualiza los campos oficiales y guarda los cambios en la base de datos.
+                    Actualiza los campos oficiales y fotografías del DNI en la base de datos.
                   </p>
                 </div>
               </div>
@@ -681,9 +417,19 @@ export default function SocioTemplate({
                 </div>
               )}
 
-              {/* Form Grid */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold">
+                  Fotografías del Documento DNI / Pasaporte
+                </label>
+                <DniPhotoCapture
+                  frontImage={editDniFront}
+                  backImage={editDniBack}
+                  onChangeFront={setEditDniFront}
+                  onChangeBack={setEditDniBack}
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-                
                 <div>
                   <label className="block text-[10px] font-mono uppercase text-gray-400 font-bold mb-1">
                     Nombre <span className="text-brand-red">*</span>
@@ -841,10 +587,8 @@ export default function SocioTemplate({
                     className="w-full h-9 px-3 bg-panel-dark border border-border-dark rounded-xl text-white font-medium focus:outline-none focus:border-brand-red"
                   />
                 </div>
-
               </div>
 
-              {/* Form Action Buttons */}
               <div className="flex items-center gap-3 pt-4 border-t border-border-dark">
                 <button
                   type="submit"
@@ -856,54 +600,45 @@ export default function SocioTemplate({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setIsEditing(false); resetEditForm(); }}
+                  onClick={() => { setActiveTab('badge'); resetEditForm(); }}
                   disabled={isSaving}
                   className="px-4 h-10 bg-gray-900 border border-border-dark hover:border-gray-600 text-gray-300 rounded-xl text-xs font-bold transition-all"
                 >
                   Cancelar
                 </button>
               </div>
-
             </form>
           )}
 
-          {/* MODE 2: OFFICIAL CERTIFICATE BADGE DISPLAY */}
           {activeTab === 'badge' && (
             <div className="space-y-4">
               <div className="border border-border-dark/60 rounded-2xl p-5 relative bg-gradient-to-b from-panel-dark/40 to-brand-dark overflow-hidden">
-                
-                {/* Watermark */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-8xl font-black font-display text-gray-800/5 select-none pointer-events-none uppercase tracking-widest text-center">
-                  LAGUNA VERDE
+                  SVADHISTHANA
                 </div>
 
-                {/* Certificate Header */}
                 <div className="flex justify-between items-start border-b border-border-dark pb-4 mb-4">
                   <div>
                     <span className="text-[10px] font-mono text-brand-red font-bold tracking-widest uppercase">
-                      LAGUNA VERDE ASOCIACIÓN
+                      ASOCIACIÓN CANNABICA SVADHISTHANA
                     </span>
                     <h4 className="text-lg font-display font-bold text-gray-100 mt-1">
                       FICHA OFICIAL DE SOCIO
                     </h4>
                   </div>
                   <div className="text-right">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                      currentMember.registrationStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                      currentMember.registrationStatus === 'pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                      'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                    }`}>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${currentMember.registrationStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                        currentMember.registrationStatus === 'pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                          'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                      }`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
                       {currentMember.registrationStatus === 'approved' ? 'Aprobado' :
-                       currentMember.registrationStatus === 'pending' ? 'Pendiente' : 'Rechazado'}
+                        currentMember.registrationStatus === 'pending' ? 'Pendiente' : 'Rechazado'}
                     </span>
                   </div>
                 </div>
 
-                {/* Badge Content */}
                 <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-                  
-                  {/* Photo Frame / Avatar - Fully green with white text */}
                   <div className="w-28 h-36 bg-emerald-600 rounded-xl border border-emerald-400/50 flex flex-col items-center justify-center relative overflow-hidden shrink-0 shadow-lg shadow-emerald-950/40">
                     <span className="text-3xl font-display font-black text-white tracking-wider">
                       {currentMember.firstName.charAt(0)}{currentMember.lastName.charAt(0)}
@@ -914,7 +649,6 @@ export default function SocioTemplate({
                     <div className="absolute top-0 left-0 right-0 h-1 bg-white/40 animate-pulse"></div>
                   </div>
 
-                  {/* Metadata Grid */}
                   <div className="flex-1 grid grid-cols-2 gap-y-3.5 gap-x-4 text-xs w-full">
                     <div>
                       <p className="text-[9px] font-mono text-gray-500 font-semibold uppercase">Apellidos / Surname</p>
@@ -945,43 +679,54 @@ export default function SocioTemplate({
                       <p className="font-bold text-gray-200 mt-0.5">{currentMember.expiryDate || 'PERMANENTE'}</p>
                     </div>
                   </div>
-
                 </div>
 
-                {/* Footer */}
                 <div className="mt-6 pt-4 border-t border-border-dark flex justify-between items-center">
                   <div className="font-mono text-[9px] text-gray-500">
                     <p>REGISTRO ASOCIACIÓN: {new Date(currentMember.registerDate).toLocaleDateString()}</p>
                     <p className="text-gray-600 mt-0.5">UID: {currentMember.id.toUpperCase()}</p>
                   </div>
-                  <div className="h-6 flex items-end gap-0.5" style={{ imageRendering: 'pixelated' }}>
-                    <div className="w-0.5 h-6 bg-gray-500"></div>
-                    <div className="w-1 h-6 bg-gray-500"></div>
-                    <div className="w-0.5 h-6 bg-gray-500"></div>
-                    <div className="w-0.5 h-4 bg-gray-500"></div>
-                    <div className="w-1 h-6 bg-gray-500"></div>
-                    <div className="w-0.5 h-6 bg-gray-500"></div>
-                    <div className="w-1 h-5 bg-gray-500"></div>
-                    <div className="w-0.5 h-6 bg-gray-500"></div>
-                  </div>
                 </div>
-
               </div>
 
               <div className="p-3.5 rounded-xl bg-panel-dark/50 border border-border-dark flex items-center gap-3">
                 <CheckCircle size={16} className="text-emerald-500 shrink-0" />
                 <div className="text-[11px] text-gray-400">
                   <p className="font-semibold text-gray-200">Expediente Oficial Verificado</p>
-                  <p>Registrado por {currentMember.registeredBy.name} el {new Date(currentMember.registerDate).toLocaleDateString()}</p>
+                  <p>Registrado por {currentMember.registeredBy?.name || 'ADMIN'} el {new Date(currentMember.registerDate).toLocaleDateString()}</p>
                 </div>
               </div>
+
+              {(frontImageDisplay || backImageDisplay) && (
+                <div className="grid grid-cols-2 gap-3 bg-brand-dark p-4 rounded-2xl border border-border-dark mt-4">
+                  <div>
+                    <p className="text-[10px] font-mono text-gray-400 uppercase font-bold mb-2">DNI Delantera (Anverso)</p>
+                    {frontImageDisplay ? (
+                      <img src={frontImageDisplay} alt="DNI Delantera" className="w-full aspect-[1.58/1] object-cover rounded-xl border border-border-dark" />
+                    ) : (
+                      <div className="aspect-[1.58/1] bg-panel-dark border border-dashed border-border-dark rounded-xl flex items-center justify-center text-xs text-gray-500">
+                        Sin foto delantera
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-mono text-gray-400 uppercase font-bold mb-2">DNI Trasera (Reverso)</p>
+                    {backImageDisplay ? (
+                      <img src={backImageDisplay} alt="DNI Trasera" className="w-full aspect-[1.58/1] object-cover rounded-xl border border-border-dark" />
+                    ) : (
+                      <div className="aspect-[1.58/1] bg-panel-dark border border-dashed border-border-dark rounded-xl flex items-center justify-center text-xs text-gray-500">
+                        Sin foto trasera
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* MODE 3: AUDIT TRAIL LOG SECTION */}
           {activeTab === 'audit' && (
             <div className="space-y-4">
-              {/* Audit Header */}
               <div className="flex items-center justify-between pb-3 border-b border-border-dark">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1007,7 +752,6 @@ export default function SocioTemplate({
                 </button>
               </div>
 
-              {/* Summary Metrics */}
               <div className="grid grid-cols-3 gap-2.5 py-1">
                 <div className="p-3 bg-panel-dark/70 rounded-xl border border-border-dark/80">
                   <span className="text-[10px] font-mono uppercase text-gray-400 font-semibold block">Total Registros</span>
@@ -1027,7 +771,6 @@ export default function SocioTemplate({
                 </div>
               </div>
 
-              {/* Logs List */}
               {isLoadingLogs && auditLogs.length === 0 ? (
                 <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
                   <RefreshCw size={24} className="text-emerald-400 animate-spin" />
@@ -1040,15 +783,8 @@ export default function SocioTemplate({
                   </div>
                   <h4 className="text-sm font-bold text-white">Sin registros de auditoría</h4>
                   <p className="text-xs text-gray-400 max-w-sm mx-auto">
-                    Cualquier edición de datos, modificación de estado o registro quedará automáticamente guardado en esta bitácora con los valores anteriores y nuevos.
+                    Cualquier edición de datos, modificación de estado o registro quedará automáticamente guardado en esta bitácora.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => { setActiveTab('edit'); resetEditForm(); }}
-                    className="mt-2 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md"
-                  >
-                    Editar Ficha de Socio
-                  </button>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
@@ -1058,35 +794,32 @@ export default function SocioTemplate({
                     const isBaja = log.action?.includes('BAJA');
 
                     return (
-                      <div 
-                        key={log.id} 
+                      <div
+                        key={log.id}
                         className="p-3.5 bg-panel-dark/80 hover:bg-panel-dark border border-border-dark/90 hover:border-emerald-500/30 rounded-2xl transition-all space-y-2.5"
                       >
-                        {/* Header Row */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase border ${
-                              isAlta ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' :
-                              isBaja ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' :
-                              isEstado ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' :
-                              'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
-                            }`}>
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase border ${isAlta ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' :
+                                isBaja ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' :
+                                  isEstado ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' :
+                                    'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                              }`}>
                               {log.action}
                             </span>
 
                             <span className="text-[11px] font-mono text-gray-400 flex items-center gap-1">
                               <Clock size={11} className="text-gray-500" />
-                              {new Date(log.timestamp).toLocaleString('es-ES', { 
-                                day: '2-digit', 
-                                month: 'short', 
+                              {new Date(log.timestamp).toLocaleString('es-ES', {
+                                day: '2-digit',
+                                month: 'short',
                                 year: 'numeric',
-                                hour: '2-digit', 
-                                minute: '2-digit' 
+                                hour: '2-digit',
+                                minute: '2-digit'
                               })}
                             </span>
                           </div>
 
-                          {/* Worker Avatar (solid green, white text) */}
                           <div className="flex items-center gap-1.5 shrink-0 bg-brand-dark px-2 py-1 rounded-lg border border-border-dark">
                             <div className="w-5 h-5 rounded bg-emerald-600 border border-emerald-400/40 flex items-center justify-center text-white font-bold text-[10px] shadow-sm">
                               {log.workerName ? log.workerName.charAt(0).toUpperCase() : 'W'}
@@ -1102,12 +835,10 @@ export default function SocioTemplate({
                           </div>
                         </div>
 
-                        {/* Details message */}
                         <p className="text-xs text-gray-300 leading-relaxed">
                           {log.details}
                         </p>
 
-                        {/* Granular Field Changes Diff */}
                         {log.changes && log.changes.length > 0 && (
                           <div className="mt-2 pt-2 border-t border-border-dark/60 space-y-1.5">
                             <span className="text-[10px] font-mono uppercase text-gray-400 font-bold block">
@@ -1140,15 +871,10 @@ export default function SocioTemplate({
               )}
             </div>
           )}
-
         </div>
 
-        {/* RIGHT COLUMN: Sidebar Controls & Contact Info */}
         <div className="w-full md:w-80 bg-panel-dark p-6 flex flex-col justify-between overflow-y-auto shrink-0">
-          
           <div className="space-y-5">
-            
-            {/* Contact Details */}
             <div>
               <h4 className="text-xs font-display font-semibold text-gray-200 uppercase tracking-wider">
                 Datos de Contacto
@@ -1184,17 +910,79 @@ export default function SocioTemplate({
               </div>
             </div>
 
-            {/* Quick Actions: Badge, Edit, Audit & Delete */}
+            {/* SECCIÓN DE PDF FIRMADO */}
             <div className="pt-3 border-t border-border-dark space-y-2">
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleUploadSignedPdf}
+              />
+
+              <div className="p-3 bg-brand-dark/80 rounded-xl border border-border-dark space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-gray-200">
+                  <span className="flex items-center gap-1.5 uppercase text-[10px] font-mono text-gray-400">
+                    <FileCheck size={13} className="text-emerald-400" /> PDF Firmado
+                  </span>
+                  {signedPdfData ? (
+                    <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold">
+                      GUARDADO
+                    </span>
+                  ) : (
+                    <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-mono font-bold">
+                      PENDIENTE
+                    </span>
+                  )}
+                </div>
+
+                {signedPdfData ? (
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleDownloadSignedPdf}
+                      className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow transition-all"
+                    >
+                      <Eye size={12} /> Ver / Descargar PDF Firmado
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => pdfInputRef.current?.click()}
+                      disabled={isUploadingPdf}
+                      className="p-1.5 bg-panel-dark border border-border-dark hover:border-gray-600 text-gray-300 rounded-lg text-xs font-bold"
+                      title="Reemplazar PDF Firmado"
+                    >
+                      <Upload size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => pdfInputRef.current?.click()}
+                    disabled={isUploadingPdf}
+                    className="w-full py-2 bg-brand-dark hover:bg-border-dark border border-dashed border-border-dark hover:border-brand-red text-gray-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all"
+                  >
+                    {isUploadingPdf ? (
+                      <>
+                        <RefreshCw size={12} className="animate-spin text-brand-red" /> Subiendo...
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={12} className="text-brand-red" /> Subir PDF Firmado del Socio
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-1.5">
                 <button
                   type="button"
                   onClick={() => { setActiveTab('badge'); setSaveError(null); }}
-                  className={`h-9 border rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
-                    activeTab === 'badge' 
-                      ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 shadow-sm' 
+                  className={`h-9 border rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${activeTab === 'badge'
+                      ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 shadow-sm'
                       : 'bg-brand-dark border-border-dark hover:border-gray-600 text-gray-300'
-                  }`}
+                    }`}
                 >
                   <IdCard size={13} className="text-emerald-400" />
                   Carnet
@@ -1202,11 +990,10 @@ export default function SocioTemplate({
                 <button
                   type="button"
                   onClick={() => { setActiveTab('edit'); resetEditForm(); }}
-                  className={`h-9 border rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
-                    activeTab === 'edit' 
-                      ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 shadow-sm' 
+                  className={`h-9 border rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${activeTab === 'edit'
+                      ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 shadow-sm'
                       : 'bg-brand-dark border-border-dark hover:border-gray-600 text-gray-300'
-                  }`}
+                    }`}
                 >
                   <Edit3 size={13} className="text-emerald-400" />
                   Editar
@@ -1216,11 +1003,10 @@ export default function SocioTemplate({
               <button
                 type="button"
                 onClick={() => { setActiveTab('audit'); fetchAuditLogs(); }}
-                className={`w-full h-9 border rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-                  activeTab === 'audit' 
-                    ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 shadow-sm' 
+                className={`w-full h-9 border rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${activeTab === 'audit'
+                    ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 shadow-sm'
                     : 'bg-brand-dark border-border-dark hover:border-emerald-500/40 text-gray-300 hover:text-white'
-                }`}
+                  }`}
               >
                 <History size={13} className="text-emerald-400" />
                 Historial de Auditoría ({auditLogs.length})
@@ -1236,44 +1022,15 @@ export default function SocioTemplate({
               </button>
             </div>
 
-            {/* PDF Export Options */}
             <div className="pt-4 border-t border-border-dark space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                   <FileText size={12} className="text-brand-red" />
-                  Formato Exportación
-                </span>
-                <span className="text-[9px] font-mono text-brand-red font-semibold uppercase">
-                  {pageSize === 'a4' ? 'A4 Oficial' : 'Tarjeta ID'}
+                  Documentación Svadhisthana
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-1.5 bg-brand-dark/80 p-1 rounded-xl border border-border-dark text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => setPageSize('a4')}
-                  className={`py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    pageSize === 'a4'
-                      ? 'bg-panel-dark text-white shadow border border-border-dark text-brand-red'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <FileText size={12} /> A4 Oficial
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPageSize('id_card')}
-                  className={`py-1.5 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    pageSize === 'id_card'
-                      ? 'bg-panel-dark text-white shadow border border-border-dark text-brand-red'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <IdCard size={12} /> Tarjeta ID
-                </button>
-              </div>
-
-              <label 
+              <label
                 onClick={() => setIncludeAuditHistory(!includeAuditHistory)}
                 className="flex items-center justify-between p-2 rounded-xl bg-brand-dark/50 border border-border-dark hover:border-gray-700 cursor-pointer select-none transition-all"
               >
@@ -1284,29 +1041,25 @@ export default function SocioTemplate({
                     <span className="text-[9px] text-gray-500">Agente y fecha de alta</span>
                   </div>
                 </div>
-                <div className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
-                  includeAuditHistory ? 'bg-brand-red text-white' : 'border border-gray-600 bg-transparent'
-                }`}>
+                <div className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${includeAuditHistory ? 'bg-brand-red text-white' : 'border border-gray-600 bg-transparent'
+                  }`}>
                   {includeAuditHistory && <Check size={11} />}
                 </div>
               </label>
             </div>
-
           </div>
 
-          {/* Bottom Export Buttons */}
           <div className="space-y-2 pt-4 border-t border-border-dark mt-4">
-            <button 
+            <button
               type="button"
               onClick={handleDownloadPDF}
               className="w-full h-10 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-brand-red/20 glow-border transition-all"
             >
-              <Download size={14} /> 
-              {pageSize === 'a4' ? 'Descargar Ficha A4 (PDF)' : 'Descargar Carnet ID (PDF)'}
+              <Download size={14} /> Imprimir Ficha de Alta B&W (Firma)
             </button>
 
             <div className="grid grid-cols-2 gap-2">
-              <button 
+              <button
                 type="button"
                 onClick={handleCopyDetails}
                 className="h-8 bg-gray-900 border border-border-dark hover:border-brand-red hover:text-white rounded-xl text-gray-300 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all"
@@ -1315,7 +1068,7 @@ export default function SocioTemplate({
                 {copied ? 'Copiado' : 'Copiar'}
               </button>
 
-              <button 
+              <button
                 type="button"
                 onClick={handleExportCSV}
                 className="h-8 bg-gray-900 border border-border-dark hover:border-brand-red hover:text-white rounded-xl text-gray-300 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all"
@@ -1324,9 +1077,7 @@ export default function SocioTemplate({
               </button>
             </div>
           </div>
-
         </div>
-
       </div>
     </div>
   );

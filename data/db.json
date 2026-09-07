@@ -71,6 +71,106 @@
         "id": "worker-demo",
         "name": "Juan Trabajador"
       }
+    },
+    {
+      "id": "mem-m0vha7f",
+      "dniPassport": "Y8921345T",
+      "documentType": "DNI",
+      "firstName": "SOPHIE",
+      "lastName": "LEROY",
+      "nationality": "FRANCESA",
+      "birthDate": "1994-09-21",
+      "expiryDate": "2028-09-21",
+      "email": "sophie.leroy@email.com",
+      "phone": "+34 688 987 654",
+      "address": "Avenida Diagonal 120, Barcelona",
+      "gender": "MASCULINO",
+      "registrationStatus": "approved",
+      "registerDate": "2026-09-03T11:50:34.323Z",
+      "registeredBy": {
+        "id": "e03ab68c-316d-413e-8c87-a28e18a82de2",
+        "name": "Armando-Programador Prueba"
+      }
+    },
+    {
+      "id": "mem-2f55ac9",
+      "dniPassport": "Y8921345Y",
+      "documentType": "DNI",
+      "firstName": "SOPHIE",
+      "lastName": "LEROY",
+      "nationality": "FRANCESA",
+      "birthDate": "1994-09-21",
+      "expiryDate": "2028-09-21",
+      "email": "sophie.leroy@email.com",
+      "phone": "+34 688 987 654",
+      "address": "Avenida Diagonal 120, Barcelona",
+      "gender": "MASCULINO",
+      "registrationStatus": "approved",
+      "registerDate": "2026-09-03T12:14:30.372Z",
+      "registeredBy": {
+        "id": "e03ab68c-316d-413e-8c87-a28e18a82de2",
+        "name": "Armando-Programador Prueba"
+      }
+    },
+    {
+      "id": "mem-2zva8kb",
+      "dniPassport": "51148044R",
+      "documentType": "DNI",
+      "firstName": "ARMANDO",
+      "lastName": "MIJARES ARMAS",
+      "nationality": "ESPAÑOLA",
+      "birthDate": "1995-07-31",
+      "expiryDate": "2028-07-21",
+      "email": "ssfa@gmail.com",
+      "phone": "+3463672728",
+      "address": "Calle Ramon 23",
+      "gender": "MASCULINO",
+      "registrationStatus": "approved",
+      "registerDate": "2026-09-03T12:33:24.145Z",
+      "registeredBy": {
+        "id": "e03ab68c-316d-413e-8c87-a28e18a82de2",
+        "name": "Armando-Programador Prueba"
+      }
+    },
+    {
+      "id": "mem-uxvotc0",
+      "dniPassport": "AA1298453",
+      "documentType": "PASSPORT",
+      "firstName": "MATEO",
+      "lastName": "ROSSI",
+      "nationality": "ITALIANA",
+      "birthDate": "1991-11-03",
+      "expiryDate": "2032-11-03",
+      "email": "mateo.rossi@email.com",
+      "phone": "+34 622 345 678",
+      "address": "Plaza Mayor 14, Valencia",
+      "gender": "MASCULINO",
+      "registrationStatus": "approved",
+      "registerDate": "2026-09-07T07:15:52.978Z",
+      "registeredBy": {
+        "id": "22222222-2222-2222-2222-222222222222",
+        "name": "Trabajador 1"
+      }
+    },
+    {
+      "id": "mem-h3x8q3y",
+      "dniPassport": "48291048L",
+      "documentType": "DNI",
+      "firstName": "CARLOSS",
+      "lastName": "NAVARRO SÁNCHEZ",
+      "nationality": "ESPAÑOLA",
+      "birthDate": "1988-04-12",
+      "expiryDate": "2030-04-12",
+      "email": "carloss.navarro@email.com",
+      "phone": "+34 611 234 567",
+      "address": "Calle Gran Vía 45, 3ºB, Madrid",
+      "gender": "MASCULINO",
+      "registrationStatus": "approved",
+      "registerDate": "2026-09-07T07:16:30.067Z",
+      "registeredBy": {
+        "id": "22222222-2222-2222-2222-222222222222",
+        "name": "Trabajador 1"
+      }
     }
   ],
   "notifications": [
@@ -94,6 +194,126 @@
     }
   ],
   "activityLogs": [
+    {
+      "id": "log-cqwcpb2",
+      "timestamp": "2026-09-07T07:16:30.069Z",
+      "workerName": "Trabajador 1",
+      "workerRole": "worker",
+      "action": "ALTA DE SOCIO",
+      "details": "Nuevo socio registrado: CARLOSS NAVARRO SÁNCHEZ (48291048L) [DNI]",
+      "memberId": "mem-h3x8q3y",
+      "memberName": "CARLOSS NAVARRO SÁNCHEZ",
+      "changes": [
+        {
+          "field": "registrationStatus",
+          "label": "Estado",
+          "from": "Ninguno",
+          "to": "approved"
+        },
+        {
+          "field": "dniPassport",
+          "label": "N° Documento",
+          "from": "Ninguno",
+          "to": "48291048L"
+        }
+      ]
+    },
+    {
+      "id": "log-pk2krqc",
+      "timestamp": "2026-09-07T07:15:52.980Z",
+      "workerName": "Trabajador 1",
+      "workerRole": "worker",
+      "action": "ALTA DE SOCIO",
+      "details": "Nuevo socio registrado: MATEO ROSSI (AA1298453) [PASSPORT]",
+      "memberId": "mem-uxvotc0",
+      "memberName": "MATEO ROSSI",
+      "changes": [
+        {
+          "field": "registrationStatus",
+          "label": "Estado",
+          "from": "Ninguno",
+          "to": "approved"
+        },
+        {
+          "field": "dniPassport",
+          "label": "N° Documento",
+          "from": "Ninguno",
+          "to": "AA1298453"
+        }
+      ]
+    },
+    {
+      "id": "log-4hyq4e9",
+      "timestamp": "2026-09-03T12:33:24.146Z",
+      "workerName": "Armando-Programador Prueba",
+      "workerRole": "worker",
+      "action": "ALTA DE SOCIO",
+      "details": "Nuevo socio registrado: ARMANDO MIJARES ARMAS (51148044R) [DNI]",
+      "memberId": "mem-2zva8kb",
+      "memberName": "ARMANDO MIJARES ARMAS",
+      "changes": [
+        {
+          "field": "registrationStatus",
+          "label": "Estado",
+          "from": "Ninguno",
+          "to": "approved"
+        },
+        {
+          "field": "dniPassport",
+          "label": "N° Documento",
+          "from": "Ninguno",
+          "to": "51148044R"
+        }
+      ]
+    },
+    {
+      "id": "log-tuczdir",
+      "timestamp": "2026-09-03T12:14:30.382Z",
+      "workerName": "Armando-Programador Prueba",
+      "workerRole": "worker",
+      "action": "ALTA DE SOCIO",
+      "details": "Nuevo socio registrado: SOPHIE LEROY (Y8921345Y) [DNI]",
+      "memberId": "mem-2f55ac9",
+      "memberName": "SOPHIE LEROY",
+      "changes": [
+        {
+          "field": "registrationStatus",
+          "label": "Estado",
+          "from": "Ninguno",
+          "to": "approved"
+        },
+        {
+          "field": "dniPassport",
+          "label": "N° Documento",
+          "from": "Ninguno",
+          "to": "Y8921345Y"
+        }
+      ]
+    },
+    {
+      "id": "log-12zaaqp",
+      "timestamp": "2026-09-03T11:50:34.329Z",
+      "workerName": "Armando-Programador Prueba",
+      "workerRole": "worker",
+      "action": "ALTA DE SOCIO",
+      "details": "Nuevo socio registrado: SOPHIE LEROY (Y8921345T) [DNI]",
+      "memberId": "mem-m0vha7f",
+      "memberName": "SOPHIE LEROY",
+      "changes": [
+        {
+          "field": "registrationStatus",
+          "label": "Estado",
+          "from": "Ninguno",
+          "to": "approved"
+        },
+        {
+          "field": "dniPassport",
+          "label": "N° Documento",
+          "from": "Ninguno",
+          "to": "Y8921345T"
+        }
+      ]
+    },
     {
       "id": "log-1d5r5yo",
       "timestamp": "2026-09-03T08:40:27.182Z",

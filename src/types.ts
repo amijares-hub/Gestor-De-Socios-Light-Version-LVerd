@@ -4,13 +4,14 @@ export interface WorkerUser {
   id: string;
   email: string;
   name: string;
+  password?: string;
   role: WorkerRole;
-  permissions: string[]; // e.g., 'register_users', 'view_all', 'send_push', 'manage_workers', 'export_data', 'delete_records'
+  permissions?: string[]; // e.g., 'register_users', 'view_all', 'send_push', 'manage_workers', 'export_data', 'delete_records'
   active: boolean;
-  createdAt: string;
+  createdAt?: string;
 }
 
-export type DocumentType = 'DNI' | 'PASSPORT';
+export type DocumentType = 'DNI' | 'PASSPORT' | 'NIE';
 
 export interface AssociationMember {
   id: string;
@@ -19,15 +20,21 @@ export interface AssociationMember {
   firstName: string;
   lastName: string;
   nationality: string;
-  birthDate: string;
-  expiryDate: string;
-  email: string;
-  phone: string;
-  address: string;
+  birthDate?: string;
+  expiryDate?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
   gender?: 'MASCULINO' | 'FEMENINO' | 'OTRO';
+  dniFrontImage?: string | null;
+  dniBackImage?: string | null;
+  dni_front_image?: string | null;
+  dni_back_image?: string | null;
+  signedPdf?: string | null;
+  signed_pdf?: string | null;
   registrationStatus: 'pending' | 'approved' | 'rejected';
   registerDate: string;
-  registeredBy: {
+  registeredBy?: {
     id: string;
     name: string;
   };
@@ -38,9 +45,9 @@ export interface RealTimeNotification {
   title: string;
   message: string;
   timestamp: string;
-  senderName: string;
-  senderRole: WorkerRole;
-  isPush: boolean;
+  senderName?: string;
+  senderRole?: WorkerRole | string;
+  isPush?: boolean;
   priority?: 'high' | 'normal' | 'low';
 }
 
@@ -61,7 +68,7 @@ export interface ActivityLog {
   id: string;
   timestamp: string;
   workerName: string;
-  workerRole: WorkerRole;
+  workerRole?: WorkerRole | string;
   action: string;
   details: string;
   memberId?: string;
