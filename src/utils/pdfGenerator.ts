@@ -4,7 +4,6 @@ import { AssociationMember } from '../types';
 export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFrontImage?: string; dniBackImage?: string; dni_front_image?: string; dni_back_image?: string }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  // Paleta B&W estricta
   const black = '#000000';
   const lightGray = '#E5E5E5';
 
@@ -35,7 +34,7 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
   const address = (member.address || 'NO ESPECIFICADO').toUpperCase();
   const phone = member.phone || 'N/D';
   const email = member.email || 'N/D';
-  const memberNum = (member.id || '').slice(0, 8).toUpperCase();
+  const memberNum = (member as any).memberNumber || `SOC-${(member.id || '').slice(0, 6).toUpperCase()}`;
   const reqDate = new Date(member.registerDate || Date.now()).toLocaleDateString('es-ES');
 
   let y = 28;
@@ -45,12 +44,12 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
   doc.line(15, y + 21, 195, y + 21);
 
   doc.text(`Nombre y apellidos: ${fullName}`, 18, y + 5);
-  doc.text(`DNI/NIE: ${docNum}`, 18, y + 12);
+  doc.text(`DNI/NIE/Pasaporte: ${docNum}`, 18, y + 12);
   doc.text(`Fecha de nacimiento: ${birthDate}`, 110, y + 12);
   doc.text(`Domicilio: ${address}`, 18, y + 19);
   doc.text(`Teléfono: ${phone}`, 18, y + 26);
   doc.text(`Correo electrónico: ${email}`, 80, y + 26);
-  doc.text(`N.º de socio/a: #${memberNum}`, 145, y + 26);
+  doc.text(`N.º de socio/a: ${memberNum}`, 145, y + 26);
 
   // 2. IDENTIFICACIÓN Y MAYORÍA DE EDAD
   y = 58;
@@ -62,7 +61,7 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
-  const text2 = 'La persona solicitante exhibe su DNI/NIE original en vigor para comprobar su identidad y fecha de nacimiento. La Asociación dejará constancia de dicha comprobación en el apartado de uso interno, sin conservar copia del documento de identidad.';
+  const text2 = 'La persona solicitante exhibe su DNI/NIE original en vigor para comprobar su identidad y fecha de nacimiento. La Asociación dejará constancia de dicha comprobación en el apartado de uso interno.';
   doc.text(doc.splitTextToSize(text2, 176), 18, y + 8);
 
   // 3. DECLARACIÓN RESPONSABLE
@@ -136,7 +135,7 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
   doc.setFontSize(6.5);
   doc.text(doc.splitTextToSize('La persona solicitante declara haber tenido a su disposición los Estatutos y el Reglamento de Régimen Interno vigentes en la fecha de su admisión y aceptar las obligaciones derivadas.', 176), 18, y + 8);
 
-  // 7. PROTECCIÓN DE DATOS PERSONALES (VERSIÓN EXTENDIDA)
+  // 7. PROTECCIÓN DE DATOS PERSONALES
   y = 171;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
@@ -177,12 +176,10 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
 
-  // Columna Izquierda
   doc.text('Identidad comprobada: [X] Sí   [ ] No', 18, y + 10);
   doc.text('Mayoría de edad comprobada: [X] Sí   [ ] No', 18, y + 16);
   doc.text(`Fecha efectiva de admisión: ${reqDate}`, 18, y + 22);
 
-  // Columna Derecha - Firma Junta / Sello
   doc.text('Firma Junta Directiva / Sello:', 115, y + 10);
   doc.rect(115, y + 12, 65, 17);
 
@@ -191,40 +188,26 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
   doc.setTextColor(80, 80, 80);
   doc.text('Documento interno de admisión. Su contenido deberá aplicarse conjuntamente con los Estatutos, el Reglamento de Régimen Interno y la normativa vigente.', 105, 268, { align: 'center' });
 
-  // --- PÁGINA 2: ANEXO FOTOGRÁFICO DNI (B&W) ---
-  const frontImg = member.dniFrontImage || member.dni_front_image;
-  const backImg = member.dniBackImage || member.dni_back_image;
+  // PÁGINA 2: ANEXO FOTOGRÁFICO ROSTRO DEL SOCIO
+  const memberPhoto = member.dniFrontImage || member.dni_front_image;
 
-  if (frontImg || backImg) {
+  if (memberPhoto) {
     doc.addPage();
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(black);
     doc.text('ASOCIACIÓN CANNABICA SVADHISTHANA', 105, 15, { align: 'center' });
     doc.setFontSize(8.5);
-    doc.text(`ANEXO: DOCUMENTACIÓN DIGITALIZADA - SOCIO #${memberNum}`, 105, 21, { align: 'center' });
+    doc.text(`ANEXO: FOTOGRAFÍA OFICIAL DE SOCIO ${memberNum}`, 105, 21, { align: 'center' });
     doc.line(15, 24, 195, 24);
 
-    let py = 30;
-    if (frontImg) {
-      try {
-        doc.addImage(frontImg, 'JPEG', 30, py, 150, 95);
-        doc.setFontSize(8);
-        doc.text('PARTE DELANTERA (ANVERSO)', 105, py + 101, { align: 'center' });
-        py += 110;
-      } catch (e) {
-        console.error("Error adjuntando foto delantera:", e);
-      }
-    }
-
-    if (backImg) {
-      try {
-        doc.addImage(backImg, 'JPEG', 30, py, 150, 95);
-        doc.setFontSize(8);
-        doc.text('PARTE TRASERA (REVERSO)', 105, py + 101, { align: 'center' });
-      } catch (e) {
-        console.error("Error adjuntando foto trasera:", e);
-      }
+    try {
+      doc.addImage(memberPhoto, 'JPEG', 45, 40, 120, 120);
+      doc.setFontSize(9);
+      doc.text(`Socio/a: ${fullName}`, 105, 168, { align: 'center' });
+      doc.text(`N.º de socio/a: ${memberNum}`, 105, 174, { align: 'center' });
+    } catch (e) {
+      console.error("Error adjuntando foto del socio:", e);
     }
   }
 
@@ -235,7 +218,7 @@ export function exportBulkMembersPdf(selectedMembers: AssociationMember[]) {
   selectedMembers.forEach((member, index) => {
     setTimeout(() => {
       const doc = generateSvadhisthanaAltaPdf(member);
-      doc.save(`Alta_Socio_${member.dniPassport}_Svadhisthana.pdf`);
+      doc.save(`Alta_Socio_${(member as any).memberNumber || member.dniPassport}_Svadhisthana.pdf`);
     }, index * 250);
   });
 }

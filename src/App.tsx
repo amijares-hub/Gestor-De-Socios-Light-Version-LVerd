@@ -11,7 +11,6 @@ import {
   ChevronDown,
   ChevronUp,
   Menu,
-  IdCard,
   Shield
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
@@ -25,7 +24,17 @@ import DashboardStats from './components/DashboardStats';
 import DniPhotoCapture from './components/DniPhotoCapture';
 import { generateSvadhisthanaAltaPdf } from './utils/pdfGenerator';
 
-const mapMemberFromDB = (m: any): AssociationMember & { dniFrontImage?: string; dniBackImage?: string } => ({
+// Generador de Número de Socio Alfanumérico Único
+const generateUniqueMemberNumber = (): string => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'SOC-';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
+const mapMemberFromDB = (m: any): AssociationMember & { dniFrontImage?: string; dniBackImage?: string; memberNumber?: string } => ({
   id: m.id,
   firstName: m.first_name || '',
   lastName: m.last_name || '',
@@ -44,8 +53,8 @@ const mapMemberFromDB = (m: any): AssociationMember & { dniFrontImage?: string; 
     id: m.registered_by || 'admin',
     name: 'Sistema / Agente'
   },
-  dniFrontImage: m.dni_front_image || null,
-  dniBackImage: m.dni_back_image || null
+  dniFrontImage: m.dni_front_image || m.member_photo || null,
+  dniBackImage: null
 });
 
 export default function App() {
@@ -117,7 +126,6 @@ export default function App() {
   const [formPhone, setFormPhone] = useState('');
   const [formAddress, setFormAddress] = useState('');
   const [formDniFront, setFormDniFront] = useState<string | null>(null);
-  const [formDniBack, setFormDniBack] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -321,10 +329,12 @@ export default function App() {
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workerSession?.id || '');
       const validWorkerId = isUuid ? workerSession?.id : null;
+      const memberNumber = generateUniqueMemberNumber();
 
       const { data, error } = await supabase
         .from('members')
         .insert([{
+          member_number: memberNumber,
           first_name: formFirstName.trim().toUpperCase(),
           last_name: formLastName.trim().toUpperCase(),
           dni_passport: cleanDoc,
@@ -337,33 +347,16 @@ export default function App() {
           address: formAddress.trim() || null,
           registration_status: 'approved',
           registered_by: validWorkerId,
-          dni_front_image: formDniFront,
-          dni_back_image: formDniBack
+          dni_front_image: formDniFront
         }])
         .select()
         .single();
 
       if (error) throw new Error(error.message);
 
-      const newMember: AssociationMember = {
-        id: data.id,
-        firstName: data.first_name,
-        lastName: data.last_name,
-        dniPassport: data.dni_passport,
-        documentType: data.document_type,
-        nationality: data.nationality,
-        birthDate: data.birth_date,
-        expiryDate: data.expiry_date,
-        email: data.email,
-        phone: data.phone,
-        address: data.address,
-        registrationStatus: data.registration_status,
-        registerDate: data.created_at,
-        registeredBy: { id: workerSession?.id || 'admin', name: workerSession?.name || 'Admin' }
-      };
-
+      const newMember = mapMemberFromDB(data);
       setLastRegisteredMember(newMember);
-      setFormSuccess(`🎉 Socio ${data.first_name} ${data.last_name} guardado con éxito.`);
+      setFormSuccess(`🎉 Socio ${data.first_name} ${data.last_name} guardado con éxito. Nº Socio: ${memberNumber}`);
       loadData();
 
       setFormFirstName('');
@@ -375,7 +368,6 @@ export default function App() {
       setFormPhone('');
       setFormAddress('');
       setFormDniFront(null);
-      setFormDniBack(null);
 
     } catch (err: any) {
       setFormError(err.message || 'Error al registrar el socio en Supabase.');
@@ -649,7 +641,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* MENÚ ACORDEÓN / PÍLDORA EXCLUSIVO MÓVIL Y TABLET (< lg) */}
+      {/* MENÚ ACORDEÓN EXCLUSIVO MÓVIL (< lg) */}
       <div className="lg:hidden bg-panel-dark border-b border-border-dark px-3 py-2.5">
         <div className="p-1 bg-brand-dark rounded-2xl border border-border-dark">
           <button
@@ -668,7 +660,6 @@ export default function App() {
             {isMobileMenuOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
           </button>
 
-          {/* Opciones del Acordeón Móvil (Exactas al diseño de la imagen) */}
           {isMobileMenuOpen && (
             <div className="pt-2 border-t border-border-dark/60 grid grid-cols-3 gap-1.5 p-1 animate-in slide-in-from-top-2 duration-150">
               <button
@@ -779,9 +770,7 @@ export default function App() {
             <div className="lg:col-span-5 space-y-4">
               <DniPhotoCapture
                 frontImage={formDniFront}
-                backImage={formDniBack}
                 onChangeFront={setFormDniFront}
-                onChangeBack={setFormDniBack}
               />
             </div>
 

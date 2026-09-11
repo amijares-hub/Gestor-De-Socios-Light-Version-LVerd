@@ -1,23 +1,20 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, CameraOff, Upload, CheckCircle2, Trash2, IdCard, SwitchCamera, RefreshCw } from 'lucide-react';
+import { Camera, CameraOff, Upload, CheckCircle2, Trash2, User, SwitchCamera, RefreshCw } from 'lucide-react';
 
 interface DniPhotoCaptureProps {
   frontImage: string | null;
-  backImage: string | null;
+  backImage?: string | null;
   onChangeFront: (base64: string | null) => void;
-  onChangeBack: (base64: string | null) => void;
+  onChangeBack?: (base64: string | null) => void;
 }
 
 export default function DniPhotoCapture({
   frontImage,
-  backImage,
-  onChangeFront,
-  onChangeBack
+  onChangeFront
 }: DniPhotoCaptureProps) {
-  const [activeTarget, setActiveTarget] = useState<'front' | 'back'>('front');
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [isStarting, setIsStarting] = useState<boolean>(false);
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,7 +43,7 @@ export default function DniPhotoCapture({
       videoRef.current.srcObject = streamRef.current;
       videoRef.current.setAttribute('playsinline', 'true');
       videoRef.current.muted = true;
-      videoRef.current.play().catch(err => console.error("Error reproduciendo vídeo WebRTC:", err));
+      videoRef.current.play().catch(err => console.error("Error reproduciendo vídeo:", err));
     }
   }, [isCameraActive]);
 
@@ -55,13 +52,13 @@ export default function DniPhotoCapture({
     setIsStarting(true);
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert("Tu navegador o entorno local no admite acceso WebRTC a la cámara.");
+      alert("Tu dispositivo o navegador no admite acceso WebRTC a la cámara.");
       setIsStarting(false);
       return;
     }
 
     const constraintOptions: MediaStreamConstraints[] = [
-      { video: { facingMode: { ideal: preferredFacing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { facingMode: { ideal: preferredFacing }, width: { ideal: 720 }, height: { ideal: 720 }, aspectRatio: { ideal: 1 } }, audio: false },
       { video: { facingMode: preferredFacing }, audio: false },
       { video: true, audio: false }
     ];
@@ -73,12 +70,12 @@ export default function DniPhotoCapture({
         acquiredStream = await navigator.mediaDevices.getUserMedia(constraints);
         if (acquiredStream) break;
       } catch (e) {
-        // siguiente restriccion
+        // Probando alternativa de restricción
       }
     }
 
     if (!acquiredStream) {
-      alert("No se pudo iniciar la cámara. Revisa los permisos del navegador o selecciona un archivo.");
+      alert("No se pudo iniciar la cámara. Revisa los permisos del navegador.");
       setIsStarting(false);
       return;
     }
@@ -99,24 +96,28 @@ export default function DniPhotoCapture({
     const video = videoRef.current;
     const canvas = canvasRef.current || document.createElement('canvas');
 
-    canvas.width = 800;
-    canvas.height = 500;
+    canvas.width = 600;
+    canvas.height = 600;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const base64 = canvas.toDataURL('image/jpeg', 0.65);
-
-    if (activeTarget === 'front') {
-      onChangeFront(base64);
-      setActiveTarget('back');
-    } else {
-      onChangeBack(base64);
-      stopStream();
+    if (facingMode === 'user') {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
     }
+
+    const minDim = Math.min(video.videoWidth, video.videoHeight);
+    const sx = (video.videoWidth - minDim) / 2;
+    const sy = (video.videoHeight - minDim) / 2;
+
+    ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, canvas.width, canvas.height);
+    const base64 = canvas.toDataURL('image/jpeg', 0.85);
+
+    onChangeFront(base64);
+    stopStream();
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'front' | 'back') => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
     const file = e.target.files[0];
     const reader = new FileReader();
@@ -124,14 +125,16 @@ export default function DniPhotoCapture({
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = 800;
-        canvas.height = 500;
+        canvas.width = 600;
+        canvas.height = 600;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.drawImage(img, 0, 0, 800, 500);
-          const compressed = canvas.toDataURL('image/jpeg', 0.65);
-          if (target === 'front') onChangeFront(compressed);
-          else onChangeBack(compressed);
+          const minDim = Math.min(img.width, img.height);
+          const sx = (img.width - minDim) / 2;
+          const sy = (img.height - minDim) / 2;
+          ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, 600, 600);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          onChangeFront(compressed);
         }
       };
       img.src = event.target?.result as string;
@@ -140,171 +143,110 @@ export default function DniPhotoCapture({
   };
 
   return (
-    <div className="bg-panel-dark border border-border-dark rounded-2xl p-3 sm:p-4 space-y-3.5">
+    <div className="bg-panel-dark border border-border-dark rounded-2xl p-3 sm:p-4 space-y-3">
       <canvas ref={canvasRef} className="hidden" />
 
-      <div className="flex items-center justify-between border-b border-border-dark pb-2.5">
+      <div className="flex items-center justify-between border-b border-border-dark pb-2">
         <div className="flex items-center gap-2">
-          <IdCard className="text-brand-red shrink-0" size={16} />
+          <User className="text-brand-red shrink-0" size={16} />
           <h4 className="text-[11px] sm:text-xs font-display font-bold text-white uppercase tracking-wider">
-            Documento DNI / Pasaporte
+            Fotografía Oficial del Socio / Rostro
           </h4>
         </div>
-        <span className="text-[9px] font-mono text-gray-400">
-          Requerido PDF
-        </span>
+        {frontImage && <CheckCircle2 size={14} className="text-emerald-400" />}
       </div>
 
       {isCameraActive ? (
-        <div className="relative aspect-[4/3] sm:aspect-[16/10] bg-black rounded-xl overflow-hidden border border-brand-red/60 shadow-inner">
+        <div className="relative aspect-square max-w-xs mx-auto bg-black rounded-2xl overflow-hidden border-2 border-brand-red/60 shadow-xl">
           <video
             ref={videoRef}
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
             autoPlay
             playsInline
             muted
           />
 
-          <div className="absolute top-2 left-2 right-12 sm:right-auto bg-black/85 px-2.5 py-1 rounded-lg text-[9px] sm:text-[10px] font-mono text-white font-bold uppercase border border-border-dark flex items-center gap-1.5 truncate">
-            <span className="w-2 h-2 rounded-full bg-brand-red animate-pulse shrink-0"></span>
-            <span className="truncate">Captura: {activeTarget === 'front' ? 'Anverso' : 'Reverso'}</span>
-          </div>
-
           <button
             type="button"
             onClick={toggleCameraFacing}
-            className="absolute top-2 right-2 p-2 bg-black/85 hover:bg-gray-800 text-gray-200 rounded-lg border border-border-dark transition-all"
+            className="absolute top-2 right-2 p-2 bg-black/80 text-white rounded-xl border border-border-dark"
             title="Cambiar Cámara"
           >
-            <SwitchCamera size={14} />
+            <SwitchCamera size={16} />
           </button>
 
           <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2 px-3 z-10">
             <button
               type="button"
               onClick={takePhoto}
-              className="flex-1 max-w-xs py-2.5 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 shadow-xl border border-brand-red/40"
+              className="px-4 py-2 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl font-bold text-xs uppercase flex items-center gap-2 shadow-lg"
             >
-              <Camera size={15} /> Capturar {activeTarget === 'front' ? 'Anverso' : 'Reverso'}
+              <Camera size={16} /> Capturar Foto
             </button>
             <button
               type="button"
               onClick={stopStream}
-              className="p-2.5 bg-gray-900/90 hover:bg-gray-800 text-gray-300 rounded-xl border border-border-dark"
+              className="p-2 bg-gray-900/90 text-gray-300 rounded-xl border border-border-dark"
             >
-              <CameraOff size={15} />
+              <CameraOff size={16} />
+            </button>
+          </div>
+        </div>
+      ) : frontImage ? (
+        <div className="space-y-3 text-center">
+          <div className="w-32 h-32 sm:w-36 sm:h-36 mx-auto rounded-2xl overflow-hidden border-2 border-emerald-500/50 shadow-lg relative">
+            <img src={frontImage} alt="Rostro del Socio" className="w-full h-full object-cover" />
+          </div>
+          <div className="flex justify-center gap-2 max-w-xs mx-auto">
+            <button
+              type="button"
+              onClick={() => startCamera('user')}
+              className="flex-1 py-1.5 bg-panel-dark border border-border-dark hover:border-gray-600 rounded-xl text-xs font-bold text-gray-200 flex items-center justify-center gap-1.5"
+            >
+              <Camera size={13} /> Repetir
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeFront(null)}
+              className="px-3 py-1.5 bg-rose-500/10 border border-rose-500/25 text-rose-400 rounded-xl text-xs font-bold flex items-center gap-1"
+            >
+              <Trash2 size={13} /> Borrar
             </button>
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          disabled={isStarting}
-          onClick={() => startCamera('environment')}
-          className="w-full py-3 bg-brand-dark hover:bg-border-dark border border-border-dark hover:border-brand-red text-gray-200 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 transition-all shadow-md active:scale-98"
-        >
-          {isStarting ? (
-            <>
-              <RefreshCw size={15} className="animate-spin text-brand-red" />
-              <span>Iniciando Cámara...</span>
-            </>
-          ) : (
-            <>
-              <Camera size={15} className="text-brand-red" />
-              <span>Tomar Fotos DNI con Cámara</span>
-            </>
-          )}
-        </button>
+        <div className="space-y-2">
+          <button
+            type="button"
+            disabled={isStarting}
+            onClick={() => startCamera('user')}
+            className="w-full py-3 bg-brand-dark hover:bg-border-dark border border-border-dark hover:border-brand-red text-gray-200 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 transition-all shadow-md active:scale-98"
+          >
+            {isStarting ? (
+              <>
+                <RefreshCw size={15} className="animate-spin text-brand-red" />
+                <span>Iniciando Cámara...</span>
+              </>
+            ) : (
+              <>
+                <Camera size={15} className="text-brand-red" />
+                <span>Tomar Foto del Socio con Cámara</span>
+              </>
+            )}
+          </button>
+
+          <label className="w-full py-2 bg-panel-dark/60 hover:bg-panel-dark border border-dashed border-border-dark rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all">
+            <Upload size={14} className="text-gray-400" />
+            <span className="text-[10px] font-mono text-gray-400 font-bold uppercase">Subir Imagen desde Galería</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </label>
+        </div>
       )}
-
-      {/* Reorganización responsive: 1 columna en móviles, 2 en pantallas más grandes */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* ANVERSO */}
-        <div className="bg-brand-dark p-3 rounded-xl border border-border-dark space-y-2">
-          <div className="flex justify-between items-center text-[10px] font-mono font-bold text-gray-400 uppercase">
-            <span>Parte Delantera (Anverso)</span>
-            {frontImage && <CheckCircle2 size={13} className="text-emerald-400" />}
-          </div>
-
-          {frontImage ? (
-            <div className="space-y-2">
-              <div className="relative aspect-[1.58/1] rounded-lg overflow-hidden border border-border-dark">
-                <img src={frontImage} alt="DNI Delantera" className="w-full h-full object-cover" />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setActiveTarget('front'); startCamera(); }}
-                  className="flex-1 py-1.5 px-2 bg-panel-dark border border-border-dark hover:border-gray-600 rounded-lg text-[10px] font-bold text-gray-300 flex items-center justify-center gap-1 active:bg-gray-800"
-                >
-                  <Camera size={11} /> Repetir
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChangeFront(null)}
-                  className="py-1.5 px-3 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 text-rose-400 rounded-lg text-[10px] font-bold flex items-center gap-1 active:bg-rose-500/30"
-                >
-                  <Trash2 size={11} /> Borrar
-                </button>
-              </div>
-            </div>
-          ) : (
-            <label className="aspect-[1.58/1] border-2 border-dashed border-border-dark hover:border-brand-red/50 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-panel-dark/40 hover:bg-panel-dark transition-all p-2">
-              <Upload size={18} className="text-gray-500" />
-              <span className="text-[10px] font-mono text-gray-400 uppercase font-semibold">Subir Foto Anverso</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleFileUpload(e, 'front')}
-              />
-            </label>
-          )}
-        </div>
-
-        {/* REVERSO */}
-        <div className="bg-brand-dark p-3 rounded-xl border border-border-dark space-y-2">
-          <div className="flex justify-between items-center text-[10px] font-mono font-bold text-gray-400 uppercase">
-            <span>Parte Trasera (Reverso)</span>
-            {backImage && <CheckCircle2 size={13} className="text-emerald-400" />}
-          </div>
-
-          {backImage ? (
-            <div className="space-y-2">
-              <div className="relative aspect-[1.58/1] rounded-lg overflow-hidden border border-border-dark">
-                <img src={backImage} alt="DNI Trasera" className="w-full h-full object-cover" />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setActiveTarget('back'); startCamera(); }}
-                  className="flex-1 py-1.5 px-2 bg-panel-dark border border-border-dark hover:border-gray-600 rounded-lg text-[10px] font-bold text-gray-300 flex items-center justify-center gap-1 active:bg-gray-800"
-                >
-                  <Camera size={11} /> Repetir
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChangeBack(null)}
-                  className="py-1.5 px-3 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 text-rose-400 rounded-lg text-[10px] font-bold flex items-center gap-1 active:bg-rose-500/30"
-                >
-                  <Trash2 size={11} /> Borrar
-                </button>
-              </div>
-            </div>
-          ) : (
-            <label className="aspect-[1.58/1] border-2 border-dashed border-border-dark hover:border-brand-red/50 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer bg-panel-dark/40 hover:bg-panel-dark transition-all p-2">
-              <Upload size={18} className="text-gray-500" />
-              <span className="text-[10px] font-mono text-gray-400 uppercase font-semibold">Subir Foto Reverso</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => handleFileUpload(e, 'back')}
-              />
-            </label>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

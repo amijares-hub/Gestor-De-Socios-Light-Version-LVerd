@@ -6,7 +6,7 @@ export interface WorkerUser {
   name: string;
   password?: string;
   role: WorkerRole;
-  permissions?: string[]; // e.g., 'register_users', 'view_all', 'send_push', 'manage_workers', 'export_data', 'delete_records'
+  permissions?: string[];
   active: boolean;
   createdAt?: string;
 }
@@ -15,6 +15,7 @@ export type DocumentType = 'DNI' | 'PASSPORT' | 'NIE';
 
 export interface AssociationMember {
   id: string;
+  memberNumber: string; // Número de socio alfanumérico único (Ej: SOC-K9P2X4)
   dniPassport: string;
   documentType: DocumentType;
   firstName: string;
@@ -26,10 +27,7 @@ export interface AssociationMember {
   phone?: string;
   address?: string;
   gender?: 'MASCULINO' | 'FEMENINO' | 'OTRO';
-  dniFrontImage?: string | null;
-  dniBackImage?: string | null;
-  dni_front_image?: string | null;
-  dni_back_image?: string | null;
+  memberPhoto?: string | null; // Fotografía del rostro del socio
   signedPdf?: string | null;
   signed_pdf?: string | null;
   registrationStatus: 'pending' | 'approved' | 'rejected';
