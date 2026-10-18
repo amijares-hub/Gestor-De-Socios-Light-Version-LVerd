@@ -15,7 +15,7 @@ export type DocumentType = 'DNI' | 'PASSPORT' | 'NIE';
 
 export interface AssociationMember {
   id: string;
-  memberNumber: string; // Número de socio alfanumérico único (Ej: SOC-K9P2X4)
+  memberNumber?: string; // Número de socio alfanumérico único (Ej: SOC-K9P2X4)
   dniPassport: string;
   documentType: DocumentType;
   firstName: string;
@@ -28,6 +28,11 @@ export interface AssociationMember {
   address?: string;
   gender?: 'MASCULINO' | 'FEMENINO' | 'OTRO';
   memberPhoto?: string | null; // Fotografía del rostro del socio
+  // Compatibilidad con componentes existentes
+  dniFrontImage?: string | null;
+  dni_front_image?: string | null;
+  dniBackImage?: string | null;
+  dni_back_image?: string | null;
   signedPdf?: string | null;
   signed_pdf?: string | null;
   registrationStatus: 'pending' | 'approved' | 'rejected';
@@ -72,4 +77,28 @@ export interface ActivityLog {
   memberId?: string;
   memberName?: string;
   changes?: FieldChange[];
+}
+
+export interface CannabisProduct {
+  id: string;
+  name: string;
+  category: 'SATIVA' | 'INDICA' | 'HÍBRIDA' | 'EXTRACCIÓN' | 'COMESTIBLE';
+  thcCbd?: string;
+  pricePerGram: number;
+  stockGrams: number;
+  isActive: boolean;
+  createdAt?: string;
+}
+
+export interface DispensationLog {
+  id: string;
+  productId?: string;
+  productName: string;
+  memberId?: string;
+  memberNumber: string;
+  memberName: string;
+  grams: number;
+  totalPrice: number;
+  dispensedBy: string;
+  createdAt: string;
 }

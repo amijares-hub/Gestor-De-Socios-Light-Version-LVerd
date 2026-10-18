@@ -36,6 +36,7 @@ const generateUniqueMemberNumber = (): string => {
 
 const mapMemberFromDB = (m: any): AssociationMember & { dniFrontImage?: string; dniBackImage?: string; memberNumber?: string } => ({
   id: m.id,
+  memberNumber: m.member_number || `SOC-${m.id.slice(0, 6).toUpperCase()}`,
   firstName: m.first_name || '',
   lastName: m.last_name || '',
   dniPassport: m.dni_passport || '',

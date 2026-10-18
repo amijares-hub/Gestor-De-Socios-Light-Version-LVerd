@@ -52,7 +52,7 @@ export default function DniPhotoCapture({
     setIsStarting(true);
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert("Tu dispositivo o navegador no admite acceso WebRTC a la cámara.");
+      alert("Tu dispositivo o navegador no admite acceso a la cámara.");
       setIsStarting(false);
       return;
     }
@@ -70,12 +70,12 @@ export default function DniPhotoCapture({
         acquiredStream = await navigator.mediaDevices.getUserMedia(constraints);
         if (acquiredStream) break;
       } catch (e) {
-        // Probando alternativa de restricción
+        // Fallback al siguiente constraint
       }
     }
 
     if (!acquiredStream) {
-      alert("No se pudo iniciar la cámara. Revisa los permisos del navegador.");
+      alert("No se pudo iniciar la cámara. Revisa los permisos.");
       setIsStarting(false);
       return;
     }
@@ -150,7 +150,7 @@ export default function DniPhotoCapture({
         <div className="flex items-center gap-2">
           <User className="text-brand-red shrink-0" size={16} />
           <h4 className="text-[11px] sm:text-xs font-display font-bold text-white uppercase tracking-wider">
-            Fotografía Oficial del Socio / Rostro
+            Fotografía Oficial del Socio (Rostro)
           </h4>
         </div>
         {frontImage && <CheckCircle2 size={14} className="text-emerald-400" />}
@@ -237,7 +237,7 @@ export default function DniPhotoCapture({
 
           <label className="w-full py-2 bg-panel-dark/60 hover:bg-panel-dark border border-dashed border-border-dark rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all">
             <Upload size={14} className="text-gray-400" />
-            <span className="text-[10px] font-mono text-gray-400 font-bold uppercase">Subir Imagen desde Galería</span>
+            <span className="text-[10px] font-mono text-gray-400 font-bold uppercase">Subir Foto desde Galería</span>
             <input
               type="file"
               accept="image/*"

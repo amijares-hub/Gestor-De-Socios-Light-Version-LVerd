@@ -207,9 +207,17 @@ export default function WorkerPortal({
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeWorker.id);
       const validWorkerId = isUuid ? activeWorker.id : null;
 
+      // Generar código alfanumérico único para el nuevo socio
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let autoMemberNum = 'SOC-';
+      for (let i = 0; i < 6; i++) {
+        autoMemberNum += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
       const { data, error } = await supabase
         .from('members')
         .insert([{
+          member_number: autoMemberNum,
           first_name: regFirstName.trim().toUpperCase(),
           last_name: regLastName.trim().toUpperCase(),
           dni_passport: docNum,
@@ -222,8 +230,7 @@ export default function WorkerPortal({
           address: regAddress.trim() || null,
           registration_status: 'approved',
           registered_by: validWorkerId,
-          dni_front_image: dniFront,
-          dni_back_image: dniBack
+          dni_front_image: dniFront
         }])
         .select()
         .single();
@@ -232,6 +239,7 @@ export default function WorkerPortal({
 
       const newMember: AssociationMember = {
         id: data.id,
+        memberNumber: data.member_number || autoMemberNum,
         firstName: data.first_name,
         lastName: data.last_name,
         dniPassport: data.dni_passport,
@@ -244,12 +252,14 @@ export default function WorkerPortal({
         address: data.address,
         registrationStatus: data.registration_status,
         registerDate: data.created_at,
-        registeredBy: { id: activeWorker.id, name: activeWorker.name }
+        registeredBy: { id: activeWorker.id, name: activeWorker.name },
+        dniFrontImage: data.dni_front_image,
+        dniBackImage: null
       };
 
       onMemberRegistered(newMember);
       setLastRegisteredMember(newMember);
-      setSubmitSuccess(`🎉 Socio ${data.first_name} ${data.last_name} guardado con éxito.`);
+      setSubmitSuccess(`🎉 Socio ${data.first_name} ${data.last_name} guardado con éxito. (Nº: ${autoMemberNum})`);
       playBeep(1040, 'triangle', 0.18);
 
       setRegFirstName('');

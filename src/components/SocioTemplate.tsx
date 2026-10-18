@@ -605,12 +605,21 @@ export default function SocioTemplate({
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
-                  <div className="w-24 h-32 bg-emerald-600 rounded-xl border border-emerald-400/50 flex flex-col items-center justify-center relative overflow-hidden shrink-0 shadow-lg">
-                    <span className="text-2xl font-display font-black text-white">
-                      {currentMember.firstName.charAt(0)}{currentMember.lastName.charAt(0)}
-                    </span>
-                    <span className="absolute bottom-1 text-[7px] font-mono text-white font-bold uppercase bg-emerald-800/90 px-1.5 py-0.5 rounded">
-                      FOTO
+                  {/* FOTO OFICIAL DEL SOCIO EN EL CARNET */}
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-2 border-emerald-400/50 shadow-lg relative bg-brand-dark shrink-0 flex items-center justify-center">
+                    {currentMember.dniFrontImage || currentMember.dni_front_image ? (
+                      <img 
+                        src={currentMember.dniFrontImage || currentMember.dni_front_image} 
+                        alt="Foto Socio" 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <span className="text-2xl font-display font-black text-white">
+                        {currentMember.firstName.charAt(0)}{currentMember.lastName.charAt(0)}
+                      </span>
+                    )}
+                    <span className="absolute bottom-1 text-[7px] font-mono text-white font-bold uppercase bg-black/75 px-1.5 py-0.2 rounded">
+                      Socio
                     </span>
                   </div>
 
