@@ -6,9 +6,14 @@ import { WorkerUser } from '../types';
 interface PanicButtonProps {
   currentWorker: WorkerUser;
   locationLabel?: string;
+  onPanicTriggered?: () => void; // Callback para cierre de sesión automático
 }
 
-export default function PanicButton({ currentWorker, locationLabel = 'Dispensario Principal' }: PanicButtonProps) {
+export default function PanicButton({ 
+  currentWorker, 
+  locationLabel = 'Dispensario Principal',
+  onPanicTriggered 
+}: PanicButtonProps) {
   const [isTriggered, setIsTriggered] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
@@ -70,6 +75,10 @@ export default function PanicButton({ currentWorker, locationLabel = 'Dispensari
       console.error('Error al emitir alerta de pánico:', err);
     } finally {
       setIsSending(false);
+      // 4. CIERRE DE SESIÓN AUTOMÁTICO INMEDIATO POR SEGURIDAD
+      if (onPanicTriggered) {
+        onPanicTriggered();
+      }
     }
   };
 

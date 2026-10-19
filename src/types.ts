@@ -123,3 +123,27 @@ export interface EmergencyContact {
   isActive: boolean;
   createdAt?: string;
 }
+
+export type ExpenseCategory = 
+  | 'Alquiler'
+  | 'Luz'
+  | 'Agua'
+  | 'Internet'
+  | 'Alarma'
+  | 'Suministros varios (compras)'
+  | 'Gastos administrativos'
+  | 'Seguros'
+  | 'Extintores'
+  | 'Impuestos Varios'
+  | 'Otros';
+
+export interface Expense {
+  id: string;
+  category: ExpenseCategory;
+  customCategory?: string;
+  description?: string;
+  amount: number;
+  expenseDate: string;
+  createdBy?: string;
+  createdAt?: string;
+}

@@ -362,7 +362,11 @@ export default function WorkerPortal({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
-          <PanicButton currentWorker={activeWorker} locationLabel="Mostrador del Trabajador" />
+          <PanicButton 
+            currentWorker={activeWorker} 
+            locationLabel="Mostrador del Trabajador"
+            onPanicTriggered={onLogout} 
+          />
 
           <button
             onClick={() => {

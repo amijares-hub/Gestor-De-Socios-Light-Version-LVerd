@@ -24,6 +24,7 @@ import DashboardStats from './components/DashboardStats';
 import DniPhotoCapture from './components/DniPhotoCapture';
 import PanicButton from './components/PanicButton';
 import PanicAlarmModal from './components/PanicAlarmModal';
+import ExpensesManager from './components/ExpensesManager';
 import { generateSvadhisthanaAltaPdf } from './utils/pdfGenerator';
 
 // Generador de Número de Socio Alfanumérico Único
@@ -741,6 +742,9 @@ export default function App() {
         {activeTab === 'members' && (
           <div className="space-y-6">
             <DashboardStats members={members} />
+
+            {/* SECCIÓN DE CONTABILIDAD Y GASTOS OPERATIVOS */}
+            <ExpensesManager />
 
             <div className="bg-panel-dark border border-border-dark rounded-3xl p-4 sm:p-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
