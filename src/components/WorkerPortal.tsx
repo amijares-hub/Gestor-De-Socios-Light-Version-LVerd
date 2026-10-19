@@ -11,6 +11,7 @@ import { AssociationMember, WorkerUser, RealTimeNotification, DocumentType } fro
 import ConfirmModal from './ConfirmModal';
 import DuplicateWarningModal from './DuplicateWarningModal';
 import WorkerAlertPreferencesPanel, { WorkerPreferences, defaultWorkerPrefs } from './WorkerAlertPreferencesPanel';
+import PanicButton from './PanicButton';
 import { generateSvadhisthanaAltaPdf, exportBulkMembersPdf } from '../utils/pdfGenerator';
 
 export interface WorkerPortalProps {
@@ -361,6 +362,8 @@ export default function WorkerPortal({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4">
+          <PanicButton currentWorker={activeWorker} locationLabel="Mostrador del Trabajador" />
+
           <button
             onClick={() => {
               setPrefs((prev: any) => ({ ...prev, masterSound: !prev.masterSound }));

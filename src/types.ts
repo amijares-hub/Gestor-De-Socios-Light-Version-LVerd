@@ -102,3 +102,24 @@ export interface DispensationLog {
   dispensedBy: string;
   createdAt: string;
 }
+
+export interface PanicAlert {
+  id: string;
+  workerId?: string;
+  workerName: string;
+  workerRole: string;
+  location?: string;
+  status: 'ACTIVE' | 'RESOLVED' | 'FALSE_ALARM';
+  resolvedBy?: string;
+  resolvedAt?: string;
+  createdAt: string;
+}
+
+export interface EmergencyContact {
+  id: string;
+  name: string;
+  phone: string;
+  role: string;
+  isActive: boolean;
+  createdAt?: string;
+}

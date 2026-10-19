@@ -15,13 +15,15 @@ import {
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-import { WorkerUser, AssociationMember, RealTimeNotification, ActivityLog } from './types';
+import { WorkerUser, AssociationMember, RealTimeNotification, ActivityLog, PanicAlert } from './types';
 import SocioTemplate from './components/SocioTemplate';
 import WorkersPanel from './components/WorkersPanel';
 import WorkerPortal from './components/WorkerPortal';
 import DuplicateWarningModal from './components/DuplicateWarningModal';
 import DashboardStats from './components/DashboardStats';
 import DniPhotoCapture from './components/DniPhotoCapture';
+import PanicButton from './components/PanicButton';
+import PanicAlarmModal from './components/PanicAlarmModal';
 import { generateSvadhisthanaAltaPdf } from './utils/pdfGenerator';
 
 // Generador de Número de Socio Alfanumérico Único
@@ -97,6 +99,7 @@ export default function App() {
   const [workers, setWorkers] = useState<WorkerUser[]>([]);
   const [notifications, setNotifications] = useState<RealTimeNotification[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [panicAlerts, setPanicAlerts] = useState<PanicAlert[]>([]);
 
   const [selectedMember, setSelectedMember] = useState<AssociationMember | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -229,10 +232,29 @@ export default function App() {
     }
   };
 
+  const loadPanicAlerts = async () => {
+    const { data } = await supabase
+      .from('panic_alerts')
+      .select('*')
+      .eq('status', 'ACTIVE');
+    if (data) {
+      setPanicAlerts(data.map((d: any) => ({
+        id: d.id,
+        workerId: d.worker_id,
+        workerName: d.worker_name,
+        workerRole: d.worker_role,
+        location: d.location,
+        status: d.status,
+        createdAt: d.created_at
+      })));
+    }
+  };
+
   useEffect(() => {
     if (workerSession) {
       localStorage.setItem('svadhisthana_worker_session', JSON.stringify(workerSession));
       loadData();
+      loadPanicAlerts();
 
       const channel = supabase.channel('public-changes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => loadData())
@@ -241,8 +263,16 @@ export default function App() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => fetchAppSettings())
         .subscribe();
 
+      const panicChannel = supabase
+        .channel('realtime-panic')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'panic_alerts' }, () => {
+          loadPanicAlerts();
+        })
+        .subscribe();
+
       return () => {
         supabase.removeChannel(channel);
+        supabase.removeChannel(panicChannel);
       };
     } else {
       localStorage.removeItem('svadhisthana_worker_session');
@@ -632,6 +662,7 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          <PanicButton currentWorker={workerSession} locationLabel="Panel de Administrador" />
           <div className="text-right">
             <p className="text-xs font-bold text-white leading-none truncate max-w-[100px] sm:max-w-none">{workerSession.name}</p>
             <p className="text-[9px] font-mono text-gray-500 uppercase">{workerSession.role}</p>
@@ -989,6 +1020,13 @@ export default function App() {
           currentWorker={workerSession}
         />
       )}
+
+      {/* Alarma de pánico para administradores */}
+      <PanicAlarmModal 
+        alerts={panicAlerts} 
+        currentAdmin={workerSession} 
+        onAlertResolved={(id) => setPanicAlerts(prev => prev.filter(a => a.id !== id))} 
+      />
     </div>
   );
 }

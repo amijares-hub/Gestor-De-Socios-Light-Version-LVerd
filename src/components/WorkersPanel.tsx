@@ -14,10 +14,12 @@ import {
   X,
   AlertCircle,
   Upload,
-  Sparkles
+  Sparkles,
+  Phone
 } from 'lucide-react';
 import { WorkerUser, ActivityLog } from '../types';
 import { supabase } from '../supabaseClient';
+import EmergencyContactsManager from './EmergencyContactsManager';
 
 interface WorkersPanelProps {
   adminWorker: WorkerUser;
@@ -42,7 +44,7 @@ export default function WorkersPanel({
   appLogo = null,
   onUpdateAppSettings
 }: WorkersPanelProps) {
-  const [activeTab, setActiveTab] = useState<'workers' | 'settings' | 'logs'>('workers');
+  const [activeTab, setActiveTab] = useState<'workers' | 'settings' | 'logs' | 'emergency'>('workers');
   const [editingPermissionsId, setEditingPermissionsId] = useState<string | null>(null);
 
   const [editAppName, setEditAppName] = useState<string>(appName || 'SVADHISTHANA');
@@ -252,6 +254,15 @@ export default function WorkersPanel({
             }`}
           >
             <History size={13} /> Auditoría
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('emergency')}
+            className={`flex-1 sm:flex-none px-3 sm:px-4 h-8 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'emergency' ? 'bg-panel-dark text-white shadow border border-border-dark' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Phone size={13} className="text-emerald-400" /> WhatsApp Alertas
           </button>
         </div>
       </div>
@@ -646,6 +657,13 @@ export default function WorkersPanel({
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {/* DESTINATARIOS WHATSAPP DE EMERGENCIA */}
+      {activeTab === 'emergency' && (
+        <div className="flex-1">
+          <EmergencyContactsManager />
         </div>
       )}
 
