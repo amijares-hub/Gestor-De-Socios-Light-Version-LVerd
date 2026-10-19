@@ -77,10 +77,9 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
   doc.setFontSize(6.5);
   const decLines = [
     '[ ] Ser consumidor/a de cannabis con anterioridad a la solicitud de ingreso.',
-    '[ ] Utilizar cannabis con finalidad terapéutica en relación con una enfermedad o sintomatología.',
     '[ ] Declaro haber tenido a mi disposición los Estatutos y el Reglamento de Régimen Interno vigentes.',
     '[ ] Declaro que mi solicitud de ingreso está avalada por una persona socia de la Asociación.',
-    '[ ] Declaro no haber sido condenado/a por delitos previstos en los artículos 368 y 369 del Código Penal.',
+    '[ ] Declaro que mi solicitud de ingreso responde exclusivamente a fines de consumo personal y me comprometo a no vender, ceder ni facilitar cannabis a terceras personas, así como a respetar los Estatutos y el Reglamento de Régimen Interno de la Asociación.',
     '1. Es mayor de edad y los datos facilitados en esta solicitud son veraces.',
     '2. Conoce y acepta íntegramente los Estatutos y Reglamento de Régimen Interno.',
     '3. Conoce el carácter privado y de acceso restringido de la Asociación.',
@@ -89,10 +88,12 @@ export function generateSvadhisthanaAltaPdf(member: AssociationMember & { dniFro
     '6. Conoce y acepta que no podrá sacar cannabis fuera del espacio permitido.',
     '7. Asume la responsabilidad por sus actuaciones personales fuera de la Asociación.'
   ];
-  let dy = y + 8;
+
+  let dy = y + 7.5;
   decLines.forEach(line => {
-    doc.text(line, 18, dy);
-    dy += 3.6;
+    const splitLines = doc.splitTextToSize(line, 176);
+    doc.text(splitLines, 18, dy);
+    dy += splitLines.length * 3.3;
   });
 
   // 4. SOCIO/A AVALISTA
