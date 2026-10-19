@@ -85,7 +85,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [periodFilter, setPeriodFilter] = useState<'day' | 'week' | 'month'>('day');
 
-  // Modales
+  // Modales Producto
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<CannabisProduct | null>(null);
   const [formName, setFormName] = useState('');
@@ -94,12 +94,16 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
   const [formPrice, setFormPrice] = useState('6.00');
   const [formStock, setFormStock] = useState('100');
 
-  // Modal Dispensación Rápida
+  // Modales Dispensación
   const [isDispenseModalOpen, setIsDispenseModalOpen] = useState(false);
   const [selectedProductToDispense, setSelectedProductToDispense] = useState<CannabisProduct | null>(null);
   const [dispenseGrams, setDispenseGrams] = useState('1.5');
-  const [dispenseMemberSearch, setDispenseMemberSearch] = useState('');
   const [selectedMemberForDispense, setSelectedMemberForDispense] = useState<AssociationMember | null>(null);
+
+  // Modales Edición Dispensación
+  const [isEditDispenseModalOpen, setIsEditDispenseModalOpen] = useState(false);
+  const [editingDispense, setEditingDispense] = useState<DispensationLog | null>(null);
+  const [editDispenseGrams, setEditDispenseGrams] = useState('');
 
   // Cargar Productos y Dispensaciones
   const fetchDispensaryData = async () => {
@@ -225,7 +229,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
   const handleOpenDispense = (prod: CannabisProduct) => {
     setSelectedProductToDispense(prod);
     setDispenseGrams('1.5');
-    setDispenseMemberSearch('');
     setSelectedMemberForDispense(members[0] || null);
     setIsDispenseModalOpen(true);
   };
@@ -271,16 +274,97 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
     }
   };
 
-  // --- 5. FILTROS TEMPORALES PARA EL LOG / HISTORIAL ---
+  // --- 5. EDITAR Y ELIMINAR REGISTROS DE DISPENSACIÓN (ENTREGAS) ---
+  const handleOpenEditDispense = (log: DispensationLog) => {
+    setEditingDispense(log);
+    setEditDispenseGrams(log.grams.toString());
+    setIsEditDispenseModalOpen(true);
+  };
+
+  const handleSaveDispenseEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDispense) return;
+
+    const newGrams = parseFloat(editDispenseGrams);
+    if (isNaN(newGrams) || newGrams <= 0) return;
+
+    const oldGrams = editingDispense.grams;
+    const diffGrams = newGrams - oldGrams; // Si es positivo, sacamos más stock. Si es negativo, devolvemos stock.
+
+    const pricePerGram = editingDispense.totalPrice / oldGrams;
+    const newTotalPrice = newGrams * pricePerGram;
+
+    try {
+      // 1. Actualizar el registro de la dispensación
+      const { error: dispErr } = await supabase
+        .from('dispensations')
+        .update({ grams: newGrams, total_price: newTotalPrice })
+        .eq('id', editingDispense.id);
+      if (dispErr) throw dispErr;
+
+      // 2. Recalcular y actualizar el stock del producto
+      if (editingDispense.productId) {
+        const { data: prodData } = await supabase
+          .from('cannabis_products')
+          .select('stock_grams')
+          .eq('id', editingDispense.productId)
+          .single();
+
+        if (prodData) {
+          const newStock = Math.max(0, parseFloat(prodData.stock_grams) - diffGrams);
+          await supabase
+            .from('cannabis_products')
+            .update({ stock_grams: newStock })
+            .eq('id', editingDispense.productId);
+        }
+      }
+
+      setIsEditDispenseModalOpen(false);
+      fetchDispensaryData(); // Recargar datos
+    } catch (err: any) {
+      alert("Error al editar entrega: " + err.message);
+    }
+  };
+
+  const handleDeleteDispensation = async (log: DispensationLog) => {
+    if (!confirm(`¿Anular la entrega de ${log.grams}g de ${log.productName} a ${log.memberName}? Esto restaurará el stock de esta variedad en el inventario.`)) return;
+
+    try {
+      // 1. Restaurar stock al producto (si el producto aún existe en el catálogo)
+      if (log.productId) {
+        const { data: prodData } = await supabase
+          .from('cannabis_products')
+          .select('stock_grams')
+          .eq('id', log.productId)
+          .single();
+
+        if (prodData) {
+          const restoredStock = parseFloat(prodData.stock_grams) + log.grams;
+          await supabase
+            .from('cannabis_products')
+            .update({ stock_grams: restoredStock })
+            .eq('id', log.productId);
+        }
+      }
+
+      // 2. Borrar el registro
+      const { error } = await supabase.from('dispensations').delete().eq('id', log.id);
+      if (error) throw error;
+
+      fetchDispensaryData(); // Recargar tabla
+    } catch (err: any) {
+      alert("Error al anular la entrega: " + err.message);
+    }
+  };
+
+  // --- 6. FILTROS TEMPORALES PARA EL LOG / HISTORIAL ---
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-  // Inicio de semana (Lunes)
   const currentDay = now.getDay();
   const distanceToMonday = (currentDay + 6) % 7;
   const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distanceToMonday).getTime();
 
-  // Inicio de mes
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
   const filteredDispensations = dispensations.filter(d => {
@@ -291,12 +375,10 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
     return true;
   });
 
-  // Totales en el periodo seleccionado
   const totalGramsSold = filteredDispensations.reduce((acc, curr) => acc + curr.grams, 0);
   const totalAmountSold = filteredDispensations.reduce((acc, curr) => acc + curr.totalPrice, 0);
   const totalOperations = filteredDispensations.length;
 
-  // Desglose por producto en el periodo
   const productBreakdown: Record<string, { grams: number; total: number; count: number }> = {};
   filteredDispensations.forEach(d => {
     if (!productBreakdown[d.productName]) {
@@ -313,7 +395,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
     <div className="space-y-6">
       
       {/* ======================================================== */}
-      {/* 1. SECCIÓN SUPERIOR: TARJETAS KPI DE SOCIOS (IMAGEN EXACTA) */}
+      {/* 1. SECCIÓN SUPERIOR: TARJETAS KPI DE SOCIOS */}
       {/* ======================================================== */}
       <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-5 md:p-7 shadow-2xl relative overflow-hidden">
         
@@ -346,7 +428,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
 
         {/* 4 Tarjetas KPI */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Total Miembros */}
           <div className="bg-[#080d0a] border border-[#1a2a1e] rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-500/30 transition-all">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-bold">TOTAL MIEMBROS</span>
@@ -363,7 +444,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
             </div>
           </div>
 
-          {/* Card 2: Tasa de Aprobación */}
           <div className="bg-[#080d0a] border border-[#1a2a1e] rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-500/30 transition-all">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-bold">TASA DE APROBACIÓN</span>
@@ -378,7 +458,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
             </div>
           </div>
 
-          {/* Card 3: Nacionalidad Top */}
           <div className="bg-[#080d0a] border border-[#1a2a1e] rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-500/30 transition-all">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-bold">NACIONALIDAD TOP</span>
@@ -393,7 +472,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
             </div>
           </div>
 
-          {/* Card 4: Altas Mes Actual */}
           <div className="bg-[#080d0a] border border-[#1a2a1e] rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-500/30 transition-all">
             <div className="flex justify-between items-start">
               <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-bold">ALTAS MES ACTUAL</span>
@@ -445,7 +523,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
           </div>
         </div>
 
-        {/* Cuadrícula de Variedades / Productos */}
         {products.length === 0 ? (
           <div className="p-8 text-center bg-[#080d0a] rounded-2xl border border-dashed border-[#1a2a1e] text-gray-500 text-xs">
             No hay variedades registradas en el catálogo. Haz clic en "Añadir Variedad" para comenzar.
@@ -533,7 +610,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
             </p>
           </div>
 
-          {/* Selector de Periodo */}
           <div className="flex p-1 bg-[#080d0a] rounded-xl border border-[#1a2a1e] self-start sm:self-center">
             <button
               onClick={() => setPeriodFilter('day')}
@@ -625,7 +701,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
             {filteredDispensations.length === 0 ? (
               <p className="text-xs text-gray-500 text-center py-8">Sin registros en el periodo seleccionado.</p>
             ) : (
-              <table className="w-full text-left border-collapse text-xs min-w-[650px]">
+              <table className="w-full text-left border-collapse text-xs min-w-[750px]">
                 <thead>
                   <tr className="border-b border-[#1a2a1e] font-mono text-[10px] text-gray-500 uppercase font-bold bg-[#0e1711]/50">
                     <th className="py-3 px-4">Fecha / Hora</th>
@@ -634,6 +710,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
                     <th className="py-3 px-4 text-center">Cantidad</th>
                     <th className="py-3 px-4 text-right">Aporte (€)</th>
                     <th className="py-3 px-4 text-right">Operador</th>
+                    <th className="py-3 px-4 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1a2a1e]">
@@ -657,6 +734,24 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-[10px] text-gray-400">
                         {disp.dispensedBy}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleOpenEditDispense(disp)}
+                            className="p-1.5 bg-[#0e1711] hover:bg-[#1a2a1e] border border-[#1a2a1e] rounded-lg text-gray-400 hover:text-emerald-400 transition-colors"
+                            title="Editar entrega"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDispensation(disp)}
+                            className="p-1.5 bg-[#0e1711] hover:bg-rose-500/10 border border-[#1a2a1e] hover:border-rose-500/30 rounded-lg text-gray-400 hover:text-rose-400 transition-colors"
+                            title="Anular/Eliminar entrega"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -849,6 +944,61 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
               >
                 <Check size={16} />
                 <span>Confirmar Entrega</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 6. MODAL EDITAR DISPENSACIÓN (ANULACIÓN PARCIAL/EDICIÓN) */}
+      {/* ======================================================== */}
+      {isEditDispenseModalOpen && editingDispense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+          <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-6 max-w-sm w-full relative space-y-4 shadow-2xl">
+            <button 
+              onClick={() => setIsEditDispenseModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-2 border-b border-[#1a2a1e] pb-3">
+              <Edit3 className="text-emerald-400" size={20} />
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase">Editar Entrega</h3>
+                <span className="text-[10px] font-mono text-gray-400">{editingDispense.productName} - {editingDispense.memberName}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveDispenseEdit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] font-mono text-gray-400 uppercase font-bold mb-1">Gramos Entregados *</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  required
+                  value={editDispenseGrams}
+                  onChange={e => setEditDispenseGrams(e.target.value)}
+                  className="w-full h-10 px-3 bg-[#080d0a] border border-[#1a2a1e] rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Total Recalculado */}
+              <div className="p-3 bg-[#080d0a] rounded-xl border border-[#1a2a1e] flex justify-between items-center text-xs">
+                <span className="text-gray-400 font-bold uppercase font-mono">Nuevo Aporte Total:</span>
+                <span className="text-lg font-black font-mono text-emerald-400">
+                  {((parseFloat(editDispenseGrams) || 0) * (editingDispense.totalPrice / editingDispense.grams)).toFixed(2)} €
+                </span>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl shadow-lg flex items-center justify-center gap-2"
+              >
+                <Check size={16} />
+                <span>Actualizar Registro</span>
               </button>
             </form>
           </div>
