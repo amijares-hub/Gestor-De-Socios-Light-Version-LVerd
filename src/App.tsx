@@ -663,7 +663,11 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <PanicButton currentWorker={workerSession} locationLabel="Panel de Administrador" />
+          <PanicButton 
+            currentWorker={workerSession} 
+            locationLabel="Panel de Administrador"
+            onPanicTriggered={handleLogout} 
+          />
           <div className="text-right">
             <p className="text-xs font-bold text-white leading-none truncate max-w-[100px] sm:max-w-none">{workerSession.name}</p>
             <p className="text-[9px] font-mono text-gray-500 uppercase">{workerSession.role}</p>

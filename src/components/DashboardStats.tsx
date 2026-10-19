@@ -12,10 +12,8 @@ import {
   ShoppingBag, 
   Clock, 
   TrendingUp, 
-  Filter, 
   X, 
   Check, 
-  AlertCircle,
   RefreshCw,
   Coins
 } from 'lucide-react';
@@ -94,13 +92,13 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
   const [formPrice, setFormPrice] = useState('6.00');
   const [formStock, setFormStock] = useState('100');
 
-  // Modales Dispensación
+  // Modal Dispensación / Cierre de Jornada (Sin socios)
   const [isDispenseModalOpen, setIsDispenseModalOpen] = useState(false);
   const [selectedProductToDispense, setSelectedProductToDispense] = useState<CannabisProduct | null>(null);
-  const [dispenseGrams, setDispenseGrams] = useState('1.5');
-  const [selectedMemberForDispense, setSelectedMemberForDispense] = useState<AssociationMember | null>(null);
+  const [dispenseGrams, setDispenseGrams] = useState('5.0');
+  const [dispenseDate, setDispenseDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Modales Edición Dispensación
+  // Modal Edición Dispensación
   const [isEditDispenseModalOpen, setIsEditDispenseModalOpen] = useState(false);
   const [editingDispense, setEditingDispense] = useState<DispensationLog | null>(null);
   const [editDispenseGrams, setEditDispenseGrams] = useState('');
@@ -109,7 +107,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
   const fetchDispensaryData = async () => {
     setIsLoading(true);
     try {
-      // Cargar productos
       const { data: prodData, error: prodErr } = await supabase
         .from('cannabis_products')
         .select('*')
@@ -128,7 +125,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
         })));
       }
 
-      // Cargar dispensaciones
       const { data: dispData, error: dispErr } = await supabase
         .from('dispensations')
         .select('*')
@@ -141,8 +137,8 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
           productId: d.product_id,
           productName: d.product_name,
           memberId: d.member_id,
-          memberNumber: d.member_number,
-          memberName: d.member_name,
+          memberNumber: d.member_number || 'JORNADA',
+          memberName: d.member_name || 'Dispensación Diaria',
           grams: Number(d.grams) || 0,
           totalPrice: Number(d.total_price) || 0,
           dispensedBy: d.dispensed_by || 'Admin',
@@ -225,37 +221,40 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
     }
   };
 
-  // --- 4. DISPENSACIÓN RÁPIDA ---
+  // --- 4. REGISTRAR DISPENSACIÓN DE LA JORNADA ---
   const handleOpenDispense = (prod: CannabisProduct) => {
     setSelectedProductToDispense(prod);
-    setDispenseGrams('1.5');
-    setSelectedMemberForDispense(members[0] || null);
+    setDispenseGrams('5.0');
+    setDispenseDate(new Date().toISOString().split('T')[0]);
     setIsDispenseModalOpen(true);
   };
 
   const handleConfirmDispense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProductToDispense || !selectedMemberForDispense) {
-      alert("Selecciona un socio para dispensar.");
+    if (!selectedProductToDispense) return;
+
+    const gramsNum = parseFloat(dispenseGrams) || 0;
+    if (gramsNum <= 0) {
+      alert("Introduce una cantidad válida en gramos.");
       return;
     }
 
-    const gramsNum = parseFloat(dispenseGrams) || 0;
-    if (gramsNum <= 0) return;
-
     const totalPrice = gramsNum * selectedProductToDispense.pricePerGram;
+    const nowTimeStr = new Date().toTimeString().split(' ')[0];
+    const timestamp = new Date(`${dispenseDate}T${nowTimeStr}`).toISOString();
 
     try {
-      // 1. Guardar registro en dispensations
+      // 1. Guardar registro de la jornada en dispensations
       const { error: dispErr } = await supabase.from('dispensations').insert([{
         product_id: selectedProductToDispense.id,
         product_name: selectedProductToDispense.name,
-        member_id: selectedMemberForDispense.id,
-        member_number: (selectedMemberForDispense as any).memberNumber || `SOC-${selectedMemberForDispense.id.slice(0, 6)}`,
-        member_name: `${selectedMemberForDispense.firstName} ${selectedMemberForDispense.lastName}`,
+        member_id: null,
+        member_number: 'JORNADA',
+        member_name: `Cierre del día (${dispenseDate})`,
         grams: gramsNum,
         total_price: totalPrice,
-        dispensed_by: 'Administrador'
+        dispensed_by: 'Administrador / Trabajador',
+        created_at: timestamp
       }]);
 
       if (dispErr) throw dispErr;
@@ -274,7 +273,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
     }
   };
 
-  // --- 5. EDITAR Y ELIMINAR REGISTROS DE DISPENSACIÓN (ENTREGAS) ---
+  // --- 5. EDITAR Y ELIMINAR REGISTROS DE DISPENSACIÓN ---
   const handleOpenEditDispense = (log: DispensationLog) => {
     setEditingDispense(log);
     setEditDispenseGrams(log.grams.toString());
@@ -289,20 +288,18 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
     if (isNaN(newGrams) || newGrams <= 0) return;
 
     const oldGrams = editingDispense.grams;
-    const diffGrams = newGrams - oldGrams; // Si es positivo, sacamos más stock. Si es negativo, devolvemos stock.
+    const diffGrams = newGrams - oldGrams;
 
     const pricePerGram = editingDispense.totalPrice / oldGrams;
     const newTotalPrice = newGrams * pricePerGram;
 
     try {
-      // 1. Actualizar el registro de la dispensación
       const { error: dispErr } = await supabase
         .from('dispensations')
         .update({ grams: newGrams, total_price: newTotalPrice })
         .eq('id', editingDispense.id);
       if (dispErr) throw dispErr;
 
-      // 2. Recalcular y actualizar el stock del producto
       if (editingDispense.productId) {
         const { data: prodData } = await supabase
           .from('cannabis_products')
@@ -320,17 +317,16 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
       }
 
       setIsEditDispenseModalOpen(false);
-      fetchDispensaryData(); // Recargar datos
+      fetchDispensaryData();
     } catch (err: any) {
       alert("Error al editar entrega: " + err.message);
     }
   };
 
   const handleDeleteDispensation = async (log: DispensationLog) => {
-    if (!confirm(`¿Anular la entrega de ${log.grams}g de ${log.productName} a ${log.memberName}? Esto restaurará el stock de esta variedad en el inventario.`)) return;
+    if (!confirm(`¿Anular el registro de ${log.grams}g de ${log.productName}? Esto restaurará el stock en el inventario.`)) return;
 
     try {
-      // 1. Restaurar stock al producto (si el producto aún existe en el catálogo)
       if (log.productId) {
         const { data: prodData } = await supabase
           .from('cannabis_products')
@@ -347,13 +343,12 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
         }
       }
 
-      // 2. Borrar el registro
       const { error } = await supabase.from('dispensations').delete().eq('id', log.id);
       if (error) throw error;
 
-      fetchDispensaryData(); // Recargar tabla
+      fetchDispensaryData();
     } catch (err: any) {
-      alert("Error al anular la entrega: " + err.message);
+      alert("Error al anular el registro: " + err.message);
     }
   };
 
@@ -364,7 +359,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
   const currentDay = now.getDay();
   const distanceToMonday = (currentDay + 6) % 7;
   const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distanceToMonday).getTime();
-
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
   const filteredDispensations = dispensations.filter(d => {
@@ -399,7 +393,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
       {/* ======================================================== */}
       <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-5 md:p-7 shadow-2xl relative overflow-hidden">
         
-        {/* Cabecera del Panel */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1a2a1e] pb-5 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0 shadow-lg shadow-emerald-950/40">
@@ -426,7 +419,6 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
           </div>
         </div>
 
-        {/* 4 Tarjetas KPI */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-[#080d0a] border border-[#1a2a1e] rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-500/30 transition-all">
             <div className="flex justify-between items-start">
@@ -497,10 +489,10 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
           <div>
             <h3 className="text-base sm:text-lg font-display font-black text-white uppercase flex items-center gap-2">
               <ShoppingBag size={20} className="text-emerald-400" />
-              Variedades Disponibles & Dispensario
+              Variedades Disponibles & Control Diario
             </h3>
             <p className="text-xs text-gray-400 mt-0.5">
-              Administra el menú diario, fija precios por gramo y dispensa directamente a los socios
+              Control de stock por gramo y registro de dispensación al final de la jornada
             </p>
           </div>
 
@@ -584,7 +576,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
                     onClick={() => handleOpenDispense(prod)}
                     className="w-full h-8 bg-emerald-600/15 hover:bg-emerald-600 border border-emerald-500/30 hover:border-emerald-600 text-emerald-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
                   >
-                    <Scale size={13} /> Dispensar
+                    <Scale size={13} /> Dispensar Jornada
                   </button>
                 </div>
               </div>
@@ -594,11 +586,10 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
       </div>
 
       {/* ======================================================== */}
-      {/* 3. HISTORIAL / BITÁCORA DE DISPENSACIÓN INTUITIVA */}
+      {/* 3. HISTORIAL / BITÁCORA DE DISPENSACIÓN */}
       {/* ======================================================== */}
       <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-5 md:p-7 shadow-2xl space-y-6">
         
-        {/* Filtros Temporales (Día / Semana / Mes) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1a2a1e] pb-4">
           <div>
             <h3 className="text-base sm:text-lg font-display font-black text-white uppercase flex items-center gap-2">
@@ -606,7 +597,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
               Auditoría & Resumen de Dispensación
             </h3>
             <p className="text-xs text-gray-400 mt-0.5">
-              Control transparente de cantidades entregadas y aportaciones de socios
+              Control transparente de cantidades entregadas y aportaciones totales
             </p>
           </div>
 
@@ -658,7 +649,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
 
           <div className="p-4 bg-[#080d0a] border border-[#1a2a1e] rounded-2xl flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase font-bold">OPERACIONES REGISTRADAS</span>
+              <span className="text-[10px] font-mono text-gray-500 uppercase font-bold">CIERRES REGISTRADOS</span>
               <p className="text-2xl font-black text-white mt-1">{totalOperations}</p>
             </div>
             <Clock size={24} className="text-emerald-400" />
@@ -682,7 +673,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
                     <span className="text-[10px] font-mono text-emerald-400 font-bold">{stats.grams.toFixed(1)} g</span>
                   </div>
                   <div className="flex justify-between items-center text-[10px] text-gray-400 font-mono">
-                    <span>{stats.count} entregas</span>
+                    <span>{stats.count} registros</span>
                     <span>{stats.total.toFixed(2)} €</span>
                   </div>
                 </div>
@@ -694,36 +685,31 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
         {/* Tabla Detallada de Historial */}
         <div className="space-y-3 pt-2">
           <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider font-mono">
-            Bitácora de Operaciones Recientes
+            Bitácora de Cierres de Jornada
           </h4>
 
           <div className="overflow-x-auto border border-[#1a2a1e] rounded-2xl bg-[#080d0a]">
             {filteredDispensations.length === 0 ? (
               <p className="text-xs text-gray-500 text-center py-8">Sin registros en el periodo seleccionado.</p>
             ) : (
-              <table className="w-full text-left border-collapse text-xs min-w-[750px]">
+              <table className="w-full text-left border-collapse text-xs min-w-[700px]">
                 <thead>
                   <tr className="border-b border-[#1a2a1e] font-mono text-[10px] text-gray-500 uppercase font-bold bg-[#0e1711]/50">
-                    <th className="py-3 px-4">Fecha / Hora</th>
-                    <th className="py-3 px-4">Socio / Identificador</th>
+                    <th className="py-3 px-4">Fecha de Jornada</th>
                     <th className="py-3 px-4">Variedad Dispensada</th>
-                    <th className="py-3 px-4 text-center">Cantidad</th>
+                    <th className="py-3 px-4 text-center">Gramos Totales</th>
                     <th className="py-3 px-4 text-right">Aporte (€)</th>
-                    <th className="py-3 px-4 text-right">Operador</th>
+                    <th className="py-3 px-4 text-right">Registrado por</th>
                     <th className="py-3 px-4 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1a2a1e]">
                   {filteredDispensations.map(disp => (
                     <tr key={disp.id} className="hover:bg-[#0e1711]/60 transition-colors">
-                      <td className="py-3 px-4 font-mono text-[11px] text-gray-400">
-                        {new Date(disp.createdAt).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      <td className="py-3 px-4 font-mono text-[11px] text-gray-300 font-bold">
+                        {new Date(disp.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
-                      <td className="py-3 px-4">
-                        <span className="font-bold text-white block">{disp.memberName}</span>
-                        <span className="text-[10px] font-mono text-emerald-400">{disp.memberNumber}</span>
-                      </td>
-                      <td className="py-3 px-4 font-bold text-gray-200">
+                      <td className="py-3 px-4 font-bold text-emerald-400">
                         {disp.productName}
                       </td>
                       <td className="py-3 px-4 text-center font-mono font-bold text-white">
@@ -740,14 +726,14 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
                           <button
                             onClick={() => handleOpenEditDispense(disp)}
                             className="p-1.5 bg-[#0e1711] hover:bg-[#1a2a1e] border border-[#1a2a1e] rounded-lg text-gray-400 hover:text-emerald-400 transition-colors"
-                            title="Editar entrega"
+                            title="Editar cantidad"
                           >
                             <Edit3 size={13} />
                           </button>
                           <button
                             onClick={() => handleDeleteDispensation(disp)}
                             className="p-1.5 bg-[#0e1711] hover:bg-rose-500/10 border border-[#1a2a1e] hover:border-rose-500/30 rounded-lg text-gray-400 hover:text-rose-400 transition-colors"
-                            title="Anular/Eliminar entrega"
+                            title="Anular registro"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -863,7 +849,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
       )}
 
       {/* ======================================================== */}
-      {/* 5. MODAL DISPENSACIÓN RÁPIDA */}
+      {/* 5. MODAL DISPENSAR JORNADA (CON FECHA Y BOTÓN 'HOY') */}
       {/* ======================================================== */}
       {isDispenseModalOpen && selectedProductToDispense && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
@@ -878,32 +864,40 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
             <div className="flex items-center gap-2 border-b border-[#1a2a1e] pb-3">
               <Scale className="text-emerald-400" size={20} />
               <div>
-                <h3 className="text-sm font-bold text-white uppercase">Dispensar {selectedProductToDispense.name}</h3>
+                <h3 className="text-sm font-bold text-white uppercase">Cierre: {selectedProductToDispense.name}</h3>
                 <span className="text-[10px] font-mono text-gray-400">{selectedProductToDispense.pricePerGram.toFixed(2)} € / gramo</span>
               </div>
             </div>
 
             <form onSubmit={handleConfirmDispense} className="space-y-4 text-xs">
+              {/* Selector de Fecha con botón rápido "Hoy" */}
               <div>
-                <label className="block text-[10px] font-mono text-gray-400 uppercase font-bold mb-1">Socio Solicitante *</label>
-                <select
-                  value={selectedMemberForDispense?.id || ''}
-                  onChange={(e) => {
-                    const found = members.find(m => m.id === e.target.value);
-                    if (found) setSelectedMemberForDispense(found);
-                  }}
-                  className="w-full h-10 px-3 bg-[#080d0a] border border-[#1a2a1e] rounded-xl text-white font-bold focus:outline-none focus:border-emerald-500"
-                >
-                  {members.map(m => (
-                    <option key={m.id} value={m.id}>
-                      {m.lastName}, {m.firstName} ({(m as any).memberNumber || m.dniPassport})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[10px] font-mono text-gray-400 uppercase font-bold">
+                    Fecha de la Jornada *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setDispenseDate(new Date().toISOString().split('T')[0])}
+                    className="text-[10px] font-mono font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/30 flex items-center gap-1 transition-all"
+                  >
+                    <Calendar size={11} /> Hoy
+                  </button>
+                </div>
+                <input
+                  type="date"
+                  required
+                  value={dispenseDate}
+                  onChange={e => setDispenseDate(e.target.value)}
+                  className="w-full h-10 px-3 bg-[#080d0a] border border-[#1a2a1e] rounded-xl text-white font-mono text-xs font-bold focus:outline-none focus:border-emerald-500"
+                />
               </div>
 
+              {/* Gramos dispensados */}
               <div>
-                <label className="block text-[10px] font-mono text-gray-400 uppercase font-bold mb-1">Gramos a dispensar *</label>
+                <label className="block text-[10px] font-mono text-gray-400 uppercase font-bold mb-1">
+                  Gramos Dispensados en el Día *
+                </label>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -916,7 +910,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
                     className="flex-1 h-10 px-3 bg-[#080d0a] border border-[#1a2a1e] rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:border-emerald-500"
                   />
                   <div className="flex gap-1">
-                    {['1.0', '2.0', '5.0'].map(g => (
+                    {['5.0', '10.0', '20.0'].map(g => (
                       <button
                         key={g}
                         type="button"
@@ -928,11 +922,14 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
                     ))}
                   </div>
                 </div>
+                <span className="text-[10px] font-mono text-gray-500 mt-1 block">
+                  Stock disponible: {selectedProductToDispense.stockGrams.toFixed(1)} g
+                </span>
               </div>
 
               {/* Total Calculado */}
               <div className="p-3 bg-[#080d0a] rounded-xl border border-[#1a2a1e] flex justify-between items-center text-xs">
-                <span className="text-gray-400 font-bold uppercase font-mono">Aporte Total:</span>
+                <span className="text-gray-400 font-bold uppercase font-mono">Aporte Total Estimado:</span>
                 <span className="text-lg font-black font-mono text-emerald-400">
                   {((parseFloat(dispenseGrams) || 0) * selectedProductToDispense.pricePerGram).toFixed(2)} €
                 </span>
@@ -943,7 +940,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
                 className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl shadow-lg flex items-center justify-center gap-2"
               >
                 <Check size={16} />
-                <span>Confirmar Entrega</span>
+                <span>Confirmar Cierre de Jornada</span>
               </button>
             </form>
           </div>
@@ -951,7 +948,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
       )}
 
       {/* ======================================================== */}
-      {/* 6. MODAL EDITAR DISPENSACIÓN (ANULACIÓN PARCIAL/EDICIÓN) */}
+      {/* 6. MODAL EDITAR DISPENSACIÓN */}
       {/* ======================================================== */}
       {isEditDispenseModalOpen && editingDispense && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
@@ -966,14 +963,14 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
             <div className="flex items-center gap-2 border-b border-[#1a2a1e] pb-3">
               <Edit3 className="text-emerald-400" size={20} />
               <div>
-                <h3 className="text-sm font-bold text-white uppercase">Editar Entrega</h3>
-                <span className="text-[10px] font-mono text-gray-400">{editingDispense.productName} - {editingDispense.memberName}</span>
+                <h3 className="text-sm font-bold text-white uppercase">Modificar Cantidad</h3>
+                <span className="text-[10px] font-mono text-gray-400">{editingDispense.productName}</span>
               </div>
             </div>
 
             <form onSubmit={handleSaveDispenseEdit} className="space-y-4 text-xs">
               <div>
-                <label className="block text-[10px] font-mono text-gray-400 uppercase font-bold mb-1">Gramos Entregados *</label>
+                <label className="block text-[10px] font-mono text-gray-400 uppercase font-bold mb-1">Gramos Dispensados *</label>
                 <input
                   type="number"
                   step="0.1"
@@ -985,9 +982,8 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
                 />
               </div>
 
-              {/* Total Recalculado */}
               <div className="p-3 bg-[#080d0a] rounded-xl border border-[#1a2a1e] flex justify-between items-center text-xs">
-                <span className="text-gray-400 font-bold uppercase font-mono">Nuevo Aporte Total:</span>
+                <span className="text-gray-400 font-bold uppercase font-mono">Nuevo Aporte:</span>
                 <span className="text-lg font-black font-mono text-emerald-400">
                   {((parseFloat(editDispenseGrams) || 0) * (editingDispense.totalPrice / editingDispense.grams)).toFixed(2)} €
                 </span>
@@ -998,7 +994,7 @@ export default function DashboardStats({ members }: DashboardStatsProps) {
                 className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl shadow-lg flex items-center justify-center gap-2"
               >
                 <Check size={16} />
-                <span>Actualizar Registro</span>
+                <span>Guardar Cambios</span>
               </button>
             </form>
           </div>
