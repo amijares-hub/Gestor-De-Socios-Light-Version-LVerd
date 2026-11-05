@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { AlertOctagon, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { AlertOctagon } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { WorkerUser } from '../types';
 
 interface PanicButtonProps {
   currentWorker: WorkerUser;
   locationLabel?: string;
-  onPanicTriggered?: () => void; // Callback para cierre de sesión automático
+  onPanicTriggered?: () => void;
 }
 
 export default function PanicButton({ 
@@ -49,15 +49,14 @@ export default function PanicButton({
         details: `Botón de pánico presionado desde ${locationLabel}`
       }]);
 
-      // 4. Consultar números activos de los dueños para WhatsApp
+      // 4. WhatsApp en segundo plano
       const { data: contacts } = await supabase
         .from('emergency_contacts')
         .select('name, phone')
         .eq('is_active', true);
 
       if (contacts && contacts.length > 0) {
-        // Llamada a la función de envío de WhatsApp
-        await fetch('/api/send-panic-whatsapp', {
+        fetch('/api/send-panic-whatsapp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -66,27 +65,36 @@ export default function PanicButton({
             timestamp: new Date().toISOString(),
             recipients: contacts
           })
-        }).catch(e => console.warn('Servicio WhatsApp en segundo plano:', e));
+        }).catch(e => console.warn('WhatsApp en segundo plano:', e));
       }
 
       setIsTriggered(true);
-      setTimeout(() => setIsTriggered(false), 3000);
     } catch (err) {
       console.error('Error al emitir alerta de pánico:', err);
     } finally {
       setIsSending(false);
-      // 4. CIERRE DE SESIÓN AUTOMÁTICO INMEDIATO POR SEGURIDAD
+
+      // 5. CIERRE DE SESIÓN AUTOMÁTICO INMEDIATO Y BLOQUEO DEL APP
+      try {
+        localStorage.removeItem('svadhisthana_worker_session');
+        localStorage.removeItem('laguna_worker_privacy_mode');
+      } catch (e) {
+        // ignore
+      }
+
       if (onPanicTriggered) {
         onPanicTriggered();
       }
+
+      // Redirigir y recargar para expulsar cualquier dato en memoria
+      window.location.replace('/');
     }
   };
 
-  // Escuchador del atajo de teclado global: Ctrl + A
+  // Escuchador global de teclado: Ctrl + A o Cmd + A
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
-        // Prevenir la selección de todo el texto del navegador
         e.preventDefault();
         e.stopPropagation();
         triggerPanicAlert();
@@ -103,7 +111,7 @@ export default function PanicButton({
         type="button"
         onClick={triggerPanicAlert}
         disabled={isSending}
-        title="Botón de Pánico (Atajo: Ctrl + A)"
+        title="Botón de Pánico (Atajo: Ctrl + A) - Bloqueo Inmediato"
         className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase flex items-center gap-1.5 transition-all shadow-md active:scale-95 ${
           isTriggered 
             ? 'bg-emerald-600 text-white animate-pulse' 

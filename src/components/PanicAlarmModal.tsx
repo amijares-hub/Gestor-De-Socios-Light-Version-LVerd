@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { ShieldAlert, Volume2, VolumeX, CheckCircle, MapPin, Clock } from 'lucide-react';
+import React from 'react';
+import { ShieldAlert, CheckCircle, MapPin, Clock } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { PanicAlert, WorkerUser } from '../types';
 
@@ -11,66 +11,6 @@ interface PanicAlarmModalProps {
 
 export default function PanicAlarmModal({ alerts, currentAdmin, onAlertResolved }: PanicAlarmModalProps) {
   const activeAlerts = alerts.filter(a => a.status === 'ACTIVE');
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const oscillatorIntervalRef = useRef<number | null>(null);
-
-  // Reproductor de Sirena de Emergencia modular
-  const startSiren = () => {
-    try {
-      if (!audioCtxRef.current) {
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        audioCtxRef.current = new AudioContextClass();
-      }
-
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
-
-      if (oscillatorIntervalRef.current) return;
-
-      let highTone = false;
-      oscillatorIntervalRef.current = window.setInterval(() => {
-        if (!audioCtxRef.current) return;
-        const osc = audioCtxRef.current.createOscillator();
-        const gain = audioCtxRef.current.createGain();
-
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(highTone ? 960 : 640, audioCtxRef.current.currentTime);
-        highTone = !highTone;
-
-        gain.gain.setValueAtTime(0.12, audioCtxRef.current.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtxRef.current.currentTime + 0.28);
-
-        osc.connect(gain);
-        gain.connect(audioCtxRef.current.destination);
-
-        osc.start();
-        osc.stop(audioCtxRef.current.currentTime + 0.28);
-      }, 300);
-    } catch (e) {
-      console.warn("Autoplay bloqueado por el navegador:", e);
-    }
-  };
-
-  const stopSiren = () => {
-    if (oscillatorIntervalRef.current) {
-      clearInterval(oscillatorIntervalRef.current);
-      oscillatorIntervalRef.current = null;
-    }
-    if (audioCtxRef.current) {
-      audioCtxRef.current.close().catch(() => {});
-      audioCtxRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    if (activeAlerts.length > 0) {
-      startSiren();
-    } else {
-      stopSiren();
-    }
-    return () => stopSiren();
-  }, [activeAlerts.length]);
 
   const handleResolveAlert = async (alertId: string, resolution: 'RESOLVED' | 'FALSE_ALARM') => {
     try {
@@ -93,19 +33,19 @@ export default function PanicAlarmModal({ alerts, currentAdmin, onAlertResolved 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-rose-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-[#0e1711] border-2 border-rose-600 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden space-y-6 animate-pulse">
+      <div className="w-full max-w-lg bg-[#0e1711] border-2 border-rose-600 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden space-y-6">
         
-        {/* Cabecera Urgente */}
+        {/* Cabecera Urgente Silenciosa */}
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-rose-600/50 animate-bounce">
+          <div className="w-14 h-14 rounded-2xl bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-rose-600/50 animate-pulse">
             <ShieldAlert size={32} />
           </div>
           <div>
             <span className="text-[10px] font-mono font-black uppercase tracking-widest text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30">
-              EMERGENCIA EN CURSO
+              ALARMA SILENCIOSA ACTIVADA
             </span>
             <h2 className="text-xl sm:text-2xl font-display font-black text-white mt-1">
-              ¡BOTÓN DE PÁNICO ACTIVADO!
+              EMERGENCIA EN CURSO
             </h2>
           </div>
         </div>
@@ -134,7 +74,7 @@ export default function PanicAlarmModal({ alerts, currentAdmin, onAlertResolved 
                 <button
                   type="button"
                   onClick={() => handleResolveAlert(alert.id, 'RESOLVED')}
-                  className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase rounded-xl flex items-center justify-center gap-1.5 shadow-lg"
+                  className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase rounded-xl flex items-center justify-center gap-1.5 shadow-lg transition-all"
                 >
                   <CheckCircle size={15} /> Atendida / Apagar
                 </button>
@@ -142,7 +82,7 @@ export default function PanicAlarmModal({ alerts, currentAdmin, onAlertResolved 
                 <button
                   type="button"
                   onClick={() => handleResolveAlert(alert.id, 'FALSE_ALARM')}
-                  className="py-2.5 bg-gray-900 hover:bg-gray-800 border border-[#1a2a1e] text-gray-300 font-bold text-xs uppercase rounded-xl"
+                  className="py-2.5 bg-gray-900 hover:bg-gray-800 border border-[#1a2a1e] text-gray-300 font-bold text-xs uppercase rounded-xl transition-all"
                 >
                   Falsa Alarma
                 </button>
@@ -152,7 +92,7 @@ export default function PanicAlarmModal({ alerts, currentAdmin, onAlertResolved 
         </div>
 
         <p className="text-[10px] text-center font-mono text-gray-500">
-          La alarma sonora continuará activa hasta que un administrador verifique y desactive la alerta.
+          Notificación prioritaria silenciosa. Verifica las cámaras de seguridad y atiende el punto afectado.
         </p>
       </div>
     </div>

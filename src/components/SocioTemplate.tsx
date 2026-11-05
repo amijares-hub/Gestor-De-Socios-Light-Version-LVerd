@@ -10,20 +10,19 @@ import {
   Copy,
   Check,
   IdCard,
-  ShieldCheck,
   Edit3,
   Trash2,
   Save,
   AlertTriangle,
   History,
-  Clock,
-  ArrowRight,
   Upload,
   FileCheck,
   Eye,
-  RefreshCw
+  RefreshCw,
+  File,
+  Image as ImageIcon
 } from 'lucide-react';
-import { AssociationMember, WorkerUser, DocumentType, ActivityLog } from '../types';
+import { AssociationMember, WorkerUser, DocumentType, ActivityLog, MemberDocument } from '../types';
 import ConfirmModal from './ConfirmModal';
 import DniPhotoCapture from './DniPhotoCapture';
 import { generateSvadhisthanaAltaPdf } from '../utils/pdfGenerator';
@@ -32,9 +31,8 @@ import { supabase } from '../supabaseClient';
 export interface SocioTemplateProps {
   member: AssociationMember & { 
     dniFrontImage?: string; 
-    dniBackImage?: string; 
     dni_front_image?: string; 
-    dni_back_image?: string;
+    memberPhoto?: string;
     signedPdf?: string | null;
     signed_pdf?: string | null;
   };
@@ -53,15 +51,17 @@ export default function SocioTemplate({
 }: SocioTemplateProps) {
   const [currentMember, setCurrentMember] = useState(member);
   const [copied, setCopied] = useState(false);
-  const [includeAuditHistory, setIncludeAuditHistory] = useState<boolean>(true);
 
-  const [activeTab, setActiveTab] = useState<'badge' | 'edit' | 'audit'>('badge');
+  const [activeTab, setActiveTab] = useState<'badge' | 'edit' | 'audit' | 'docs'>('badge');
   const [auditLogs, setAuditLogs] = useState<ActivityLog[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
 
-  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
+  // Documentos y escaneos adjuntos
+  const [documents, setDocuments] = useState<MemberDocument[]>([]);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Formulario de edición
   const [editFirstName, setEditFirstName] = useState(member.firstName);
   const [editLastName, setEditLastName] = useState(member.lastName);
   const [editDocType, setEditDocType] = useState<DocumentType>(member.documentType || 'DNI');
@@ -75,11 +75,9 @@ export default function SocioTemplate({
   const [editPhone, setEditPhone] = useState(member.phone || '');
   const [editAddress, setEditAddress] = useState(member.address || '');
 
-  const [editDniFront, setEditDniFront] = useState<string | null>(
-    member.dniFrontImage || member.dni_front_image || null
-  );
-  const [editDniBack, setEditDniBack] = useState<string | null>(
-    member.dniBackImage || member.dni_back_image || null
+  // 1 Sola foto del socio
+  const [editPhoto, setEditPhoto] = useState<string | null>(
+    member.dniFrontImage || member.dni_front_image || member.memberPhoto || null
   );
 
   const [isSaving, setIsSaving] = useState(false);
@@ -89,6 +87,31 @@ export default function SocioTemplate({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Cargar Documentos Adjuntos del Socio
+  const fetchDocuments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('member_documents')
+        .select('*')
+        .eq('member_id', currentMember.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setDocuments(data.map((d: any) => ({
+          id: d.id,
+          memberId: d.member_id,
+          name: d.name,
+          fileType: d.file_type,
+          fileUrl: d.file_url,
+          uploadedBy: d.uploaded_by,
+          createdAt: d.created_at
+        })));
+      }
+    } catch (e) {
+      console.error('Error cargando documentos del socio:', e);
+    }
+  };
+
   const fetchAuditLogs = async () => {
     try {
       setIsLoadingLogs(true);
@@ -96,21 +119,16 @@ export default function SocioTemplate({
       if (res.ok) {
         const data = await res.json();
         setAuditLogs(data);
-      } else {
-        const fallbackRes = await fetch(`/api/activity-logs?memberId=${currentMember.id}`);
-        if (fallbackRes.ok) {
-          const data = await fallbackRes.json();
-          setAuditLogs(data);
-        }
       }
     } catch (err) {
-      console.error("Error obteniendo logs de auditoría:", err);
+      console.error("Error obteniendo logs:", err);
     } finally {
       setIsLoadingLogs(false);
     }
   };
 
   useEffect(() => {
+    fetchDocuments();
     fetchAuditLogs();
   }, [currentMember.id]);
 
@@ -127,8 +145,7 @@ export default function SocioTemplate({
     setEditEmail(currentMember.email || '');
     setEditPhone(currentMember.phone || '');
     setEditAddress(currentMember.address || '');
-    setEditDniFront(currentMember.dniFrontImage || currentMember.dni_front_image || null);
-    setEditDniBack(currentMember.dniBackImage || currentMember.dni_back_image || null);
+    setEditPhoto(currentMember.dniFrontImage || currentMember.dni_front_image || currentMember.memberPhoto || null);
     setSaveError(null);
     setSaveSuccess(null);
   };
@@ -144,7 +161,7 @@ export default function SocioTemplate({
     setSaveError(null);
     setSaveSuccess(null);
 
-    const updatedData: AssociationMember & { dniFrontImage?: string | null; dniBackImage?: string | null; dni_front_image?: string | null; dni_back_image?: string | null } = {
+    const updatedData: AssociationMember = {
       ...currentMember,
       firstName: editFirstName.trim().toUpperCase(),
       lastName: editLastName.trim().toUpperCase(),
@@ -158,10 +175,9 @@ export default function SocioTemplate({
       email: editEmail.trim(),
       phone: editPhone.trim(),
       address: editAddress.trim(),
-      dniFrontImage: editDniFront,
-      dniBackImage: editDniBack,
-      dni_front_image: editDniFront,
-      dni_back_image: editDniBack
+      dniFrontImage: editPhoto,
+      dni_front_image: editPhoto,
+      memberPhoto: editPhoto
     };
 
     try {
@@ -180,8 +196,8 @@ export default function SocioTemplate({
           address: updatedData.address || null,
           gender: updatedData.gender,
           registration_status: updatedData.registrationStatus,
-          dni_front_image: editDniFront,
-          dni_back_image: editDniBack
+          dni_front_image: editPhoto,
+          member_photo: editPhoto
         })
         .eq('id', currentMember.id);
 
@@ -191,14 +207,14 @@ export default function SocioTemplate({
         await onUpdateMember(updatedData);
       }
       setCurrentMember(updatedData);
-      setSaveSuccess("¡Ficha y fotografías actualizadas!");
+      setSaveSuccess("¡Ficha y fotografía actualizadas!");
       await fetchAuditLogs();
       setTimeout(() => {
         setActiveTab('badge');
         setSaveSuccess(null);
       }, 900);
     } catch (err: any) {
-      setSaveError(err.message || "Error al actualizar la información del socio.");
+      setSaveError(err.message || "Error al actualizar información.");
     } finally {
       setIsSaving(false);
     }
@@ -212,7 +228,7 @@ export default function SocioTemplate({
       }
       onClose();
     } catch (err: any) {
-      setSaveError(err.message || 'Error al dar de baja al socio.');
+      setSaveError(err.message || 'Error al dar de baja.');
     } finally {
       setIsDeleting(false);
       setConfirmDelete(false);
@@ -224,95 +240,93 @@ export default function SocioTemplate({
     doc.save(`Alta_Socio_${currentMember.dniPassport}_Svadhisthana.pdf`);
   };
 
-  const handleUploadSignedPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Subir Documento / Escaneo / PDF / Imagen
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
     const file = e.target.files[0];
 
-    if (file.type !== 'application/pdf') {
-      alert('Por favor, selecciona un archivo en formato PDF.');
-      return;
-    }
+    setIsUploadingDoc(true);
+    let fType: 'pdf' | 'image' | 'doc' = 'doc';
+    if (file.type.includes('pdf')) fType = 'pdf';
+    else if (file.type.includes('image')) fType = 'image';
 
-    setIsUploadingPdf(true);
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const base64Pdf = event.target?.result as string;
+      const base64Content = event.target?.result as string;
+
       try {
-        const { error } = await supabase
-          .from('members')
-          .update({ signed_pdf: base64Pdf })
-          .eq('id', currentMember.id);
+        const payload = {
+          member_id: currentMember.id,
+          name: file.name,
+          file_type: fType,
+          file_url: base64Content,
+          uploaded_by: currentWorker?.name || 'Administrador'
+        };
+
+        const { data, error } = await supabase
+          .from('member_documents')
+          .insert([payload])
+          .select()
+          .single();
 
         if (error) throw error;
 
-        const updated = { ...currentMember, signedPdf: base64Pdf, signed_pdf: base64Pdf };
-        setCurrentMember(updated);
-        if (onUpdateMember) onUpdateMember(updated);
-        alert('¡PDF firmado subido y guardado correctamente!');
+        setDocuments(prev => [
+          {
+            id: data.id,
+            memberId: data.member_id,
+            name: data.name,
+            fileType: data.file_type,
+            fileUrl: data.file_url,
+            uploadedBy: data.uploaded_by,
+            createdAt: data.created_at
+          },
+          ...prev
+        ]);
+
+        alert(`¡Archivo "${file.name}" adjuntado al expediente del socio con éxito!`);
       } catch (err: any) {
-        alert('Error al guardar el PDF firmado: ' + err.message);
+        alert('Error subiendo documento: ' + err.message);
       } finally {
-        setIsUploadingPdf(false);
+        setIsUploadingDoc(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleDownloadSignedPdf = () => {
-    const pdfData = currentMember.signedPdf || currentMember.signed_pdf;
-    if (!pdfData) return;
-
-    const link = document.createElement('a');
-    link.href = pdfData;
-    link.download = `Svadhisthana_Alta_Firmada_${currentMember.dniPassport}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDeleteDocument = async (docId: string, docName: string) => {
+    if (!confirm(`¿Eliminar el documento "${docName}"?`)) return;
+    try {
+      const { error } = await supabase.from('member_documents').delete().eq('id', docId);
+      if (error) throw error;
+      setDocuments(prev => prev.filter(d => d.id !== docId));
+    } catch (err: any) {
+      alert('Error eliminando documento: ' + err.message);
+    }
   };
 
-  const handleCopyDetails = () => {
-    const text = `Socio: ${currentMember.firstName} ${currentMember.lastName}\nDoc: ${currentMember.documentType} ${currentMember.dniPassport}\nNacionalidad: ${currentMember.nationality}\nEstado: ${currentMember.registrationStatus}\nAlta: ${currentMember.registerDate}`;
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleOpenDocument = (docItem: MemberDocument) => {
+    if (docItem.fileUrl.startsWith('data:')) {
+      const win = window.open();
+      if (win) {
+        if (docItem.fileType === 'pdf') {
+          win.document.write(`<iframe src="${docItem.fileUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`);
+        } else if (docItem.fileType === 'image') {
+          win.document.write(`<img src="${docItem.fileUrl}" style="max-width:100%; max-height:100vh; margin:auto; display:block;" />`);
+        } else {
+          const a = document.createElement('a');
+          a.href = docItem.fileUrl;
+          a.download = docItem.name;
+          a.click();
+        }
+      }
+    } else {
+      window.open(docItem.fileUrl, '_blank');
+    }
   };
 
-  const handleExportCSV = () => {
-    const headers = [
-      "ID", "Documento", "Tipo", "Nombre", "Apellidos", "Nacionalidad",
-      "Fecha Nacimiento", "Fecha Caducidad", "Email", "Telefono", "Direccion", "Estado", "Fecha Alta", "Registrador"
-    ];
-    const row = [
-      currentMember.id,
-      currentMember.dniPassport,
-      currentMember.documentType,
-      currentMember.firstName,
-      currentMember.lastName,
-      currentMember.nationality,
-      currentMember.birthDate,
-      currentMember.expiryDate,
-      currentMember.email,
-      currentMember.phone,
-      currentMember.address,
-      currentMember.registrationStatus,
-      currentMember.registerDate,
-      currentMember.registeredBy?.name || 'ADMIN'
-    ];
-    const csvContent = "data:text/csv;charset=utf-8,"
-      + [headers.map(h => `"${h}"`).join(','), row.map(r => `"${(r || '').replace(/"/g, '""')}"`).join(',')].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `socio_${currentMember.dniPassport}_${currentMember.lastName.replace(/\s+/g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const frontImageDisplay = currentMember.dniFrontImage || currentMember.dni_front_image;
-  const backImageDisplay = currentMember.dniBackImage || currentMember.dni_back_image;
-  const signedPdfData = currentMember.signedPdf || currentMember.signed_pdf;
+  const memberPhotoDisplay = currentMember.dniFrontImage || currentMember.dni_front_image || currentMember.memberPhoto;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/90 backdrop-blur-md no-print overflow-hidden">
@@ -350,21 +364,29 @@ export default function SocioTemplate({
               <button
                 type="button"
                 onClick={() => { setActiveTab('badge'); setSaveError(null); }}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${activeTab === 'badge'
-                    ? 'bg-brand-red text-white shadow-md'
-                    : 'text-gray-400 hover:text-white'
-                  }`}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  activeTab === 'badge' ? 'bg-brand-red text-white shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
               >
                 <IdCard size={13} />
                 Carnet
               </button>
               <button
                 type="button"
+                onClick={() => { setActiveTab('docs'); }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  activeTab === 'docs' ? 'bg-brand-red text-white shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <FileCheck size={13} />
+                Documentos ({documents.length})
+              </button>
+              <button
+                type="button"
                 onClick={() => { setActiveTab('edit'); resetEditForm(); }}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${activeTab === 'edit'
-                    ? 'bg-brand-red text-white shadow-md'
-                    : 'text-gray-400 hover:text-white'
-                  }`}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  activeTab === 'edit' ? 'bg-brand-red text-white shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
               >
                 <Edit3 size={13} />
                 Editar
@@ -372,10 +394,9 @@ export default function SocioTemplate({
               <button
                 type="button"
                 onClick={() => { setActiveTab('audit'); fetchAuditLogs(); }}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${activeTab === 'audit'
-                    ? 'bg-brand-red text-white shadow-md'
-                    : 'text-gray-400 hover:text-white'
-                  }`}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  activeTab === 'audit' ? 'bg-brand-red text-white shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
               >
                 <History size={13} />
                 Auditoría
@@ -387,7 +408,162 @@ export default function SocioTemplate({
             </div>
           </div>
 
-          {/* EDITAR DATOS */}
+          {/* TAB 1: CARNET OFICIAL (CON 1 SOLA FOTO) */}
+          {activeTab === 'badge' && (
+            <div className="space-y-4">
+              <div className="border border-border-dark/60 rounded-2xl p-4 sm:p-5 relative bg-gradient-to-b from-panel-dark/40 to-brand-dark overflow-hidden">
+                <div className="flex justify-between items-start border-b border-border-dark pb-3 mb-3">
+                  <div>
+                    <span className="text-[9px] font-mono text-brand-red font-bold tracking-widest uppercase">
+                      ASOCIACIÓN CANNABICA SVADHISTHANA
+                    </span>
+                    <h4 className="text-base font-display font-bold text-gray-100 mt-0.5">
+                      FICHA OFICIAL DE SOCIO
+                    </h4>
+                  </div>
+                  <div>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                      currentMember.registrationStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    }`}>
+                      {currentMember.registrationStatus === 'approved' ? 'Aprobado' : 'Pendiente'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
+                  {/* FOTO ÚNICA DEL ROSTRO DEL SOCIO */}
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden border-2 border-emerald-400/50 shadow-lg relative bg-brand-dark shrink-0 flex items-center justify-center">
+                    {memberPhotoDisplay ? (
+                      <img 
+                        src={memberPhotoDisplay} 
+                        alt="Foto Socio" 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <span className="text-3xl font-display font-black text-white">
+                        {currentMember.firstName.charAt(0)}{currentMember.lastName.charAt(0)}
+                      </span>
+                    )}
+                    <span className="absolute bottom-1 text-[7px] font-mono text-white font-bold uppercase bg-black/75 px-1.5 py-0.2 rounded">
+                      Socio
+                    </span>
+                  </div>
+
+                  <div className="flex-1 grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs w-full">
+                    <div>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Apellidos</p>
+                      <p className="font-bold text-gray-200 mt-0.5 truncate">{currentMember.lastName}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Nombre</p>
+                      <p className="font-bold text-gray-200 mt-0.5 truncate">{currentMember.firstName}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">ID Documento</p>
+                      <p className="font-mono font-bold text-brand-red mt-0.5">{currentMember.dniPassport}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Tipo</p>
+                      <p className="font-bold text-gray-200 mt-0.5">{currentMember.documentType}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Nacionalidad</p>
+                      <p className="font-bold text-gray-200 mt-0.5">{currentMember.nationality}</p>
+                    </div>
+                    <div>
+                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Nacimiento</p>
+                      <p className="font-bold text-gray-200 mt-0.5">{currentMember.birthDate || 'N/D'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: GESTOR DE DOCUMENTOS Y ESCANEOS ADJUNTOS */}
+          {activeTab === 'docs' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-border-dark pb-3">
+                <div>
+                  <h3 className="text-xs font-display font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <FileCheck size={15} className="text-emerald-400" />
+                    Expediente & Documentos Físicos Escaneados
+                  </h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Sube y gestiona cualquier documento, escaneo o PDF firmado del socio.
+                  </p>
+                </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf,image/*,.doc,.docx"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingDoc}
+                  className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase flex items-center gap-1.5 transition-all shadow"
+                >
+                  {isUploadingDoc ? <RefreshCw size={13} className="animate-spin" /> : <Upload size={13} />}
+                  <span>Subir Documento</span>
+                </button>
+              </div>
+
+              {documents.length === 0 ? (
+                <div className="p-8 text-center bg-panel-dark/50 border border-dashed border-border-dark rounded-2xl text-xs text-gray-500 space-y-2">
+                  <FileText size={28} className="mx-auto text-gray-600" />
+                  <p>No hay documentos ni escaneos adjuntos en este expediente.</p>
+                  <p className="text-[10px] text-gray-600">Puedes adjuntar contratos firmados, escaneos de DNI o documentos médicos en PDF o imagen.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2.5 max-h-[48vh] overflow-y-auto pr-1">
+                  {documents.map((doc) => (
+                    <div 
+                      key={doc.id}
+                      className="p-3 bg-panel-dark border border-border-dark rounded-xl flex items-center justify-between gap-3 hover:border-emerald-500/30 transition-all"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-[#080d0a] border border-[#1a2a1e] flex items-center justify-center text-emerald-400 shrink-0">
+                          {doc.fileType === 'pdf' ? <FileText size={16} /> : doc.fileType === 'image' ? <ImageIcon size={16} /> : <File size={16} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white truncate">{doc.name}</p>
+                          <p className="text-[9px] font-mono text-gray-500">
+                            Subido por {doc.uploadedBy} • {new Date(doc.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDocument(doc)}
+                          className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 hover:border-emerald-500 text-emerald-300 hover:text-white rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+                          title="Abrir o ver documento"
+                        >
+                          <Eye size={12} /> Ver
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                          className="p-1.5 text-gray-500 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                          title="Eliminar documento"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: EDITAR SOCIO (CON 1 SOLA FOTO) */}
           {activeTab === 'edit' && (
             <form onSubmit={handleSaveEdit} className="space-y-4 pb-6 md:pb-0">
               <div>
@@ -395,7 +571,7 @@ export default function SocioTemplate({
                   Modificar Socio
                 </h3>
                 <p className="text-[11px] text-gray-400 mt-0.5">
-                  Edita datos y fotografías del DNI.
+                  Edita datos personales y fotografía del socio.
                 </p>
               </div>
 
@@ -413,11 +589,10 @@ export default function SocioTemplate({
                 </div>
               )}
 
+              {/* Captura de 1 sola foto */}
               <DniPhotoCapture
-                frontImage={editDniFront}
-                backImage={editDniBack}
-                onChangeFront={setEditDniFront}
-                onChangeBack={setEditDniBack}
+                frontImage={editPhoto}
+                onChangeFront={setEditPhoto}
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -583,104 +758,7 @@ export default function SocioTemplate({
             </form>
           )}
 
-          {/* FICHA TIPO CARNET */}
-          {activeTab === 'badge' && (
-            <div className="space-y-4">
-              <div className="border border-border-dark/60 rounded-2xl p-4 sm:p-5 relative bg-gradient-to-b from-panel-dark/40 to-brand-dark overflow-hidden">
-                <div className="flex justify-between items-start border-b border-border-dark pb-3 mb-3">
-                  <div>
-                    <span className="text-[9px] font-mono text-brand-red font-bold tracking-widest uppercase">
-                      ASOCIACIÓN CANNABICA SVADHISTHANA
-                    </span>
-                    <h4 className="text-base font-display font-bold text-gray-100 mt-0.5">
-                      FICHA OFICIAL DE SOCIO
-                    </h4>
-                  </div>
-                  <div>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${currentMember.registrationStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                      }`}>
-                      {currentMember.registrationStatus === 'approved' ? 'Aprobado' : 'Pendiente'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
-                  {/* FOTO OFICIAL DEL SOCIO EN EL CARNET */}
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-2 border-emerald-400/50 shadow-lg relative bg-brand-dark shrink-0 flex items-center justify-center">
-                    {currentMember.dniFrontImage || currentMember.dni_front_image ? (
-                      <img 
-                        src={currentMember.dniFrontImage || currentMember.dni_front_image} 
-                        alt="Foto Socio" 
-                        className="w-full h-full object-cover" 
-                      />
-                    ) : (
-                      <span className="text-2xl font-display font-black text-white">
-                        {currentMember.firstName.charAt(0)}{currentMember.lastName.charAt(0)}
-                      </span>
-                    )}
-                    <span className="absolute bottom-1 text-[7px] font-mono text-white font-bold uppercase bg-black/75 px-1.5 py-0.2 rounded">
-                      Socio
-                    </span>
-                  </div>
-
-                  <div className="flex-1 grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs w-full">
-                    <div>
-                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Apellidos</p>
-                      <p className="font-bold text-gray-200 mt-0.5 truncate">{currentMember.lastName}</p>
-                    </div>
-                    <div>
-                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Nombre</p>
-                      <p className="font-bold text-gray-200 mt-0.5 truncate">{currentMember.firstName}</p>
-                    </div>
-                    <div>
-                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">ID Documento</p>
-                      <p className="font-mono font-bold text-brand-red mt-0.5">{currentMember.dniPassport}</p>
-                    </div>
-                    <div>
-                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Tipo</p>
-                      <p className="font-bold text-gray-200 mt-0.5">{currentMember.documentType}</p>
-                    </div>
-                    <div>
-                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Nacionalidad</p>
-                      <p className="font-bold text-gray-200 mt-0.5">{currentMember.nationality}</p>
-                    </div>
-                    <div>
-                      <p className="text-[8px] font-mono text-gray-500 font-semibold uppercase">Nacimiento</p>
-                      <p className="font-bold text-gray-200 mt-0.5">{currentMember.birthDate || 'N/D'}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {(frontImageDisplay || backImageDisplay) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-brand-dark p-3 sm:p-4 rounded-2xl border border-border-dark">
-                  <div>
-                    <p className="text-[9px] font-mono text-gray-400 uppercase font-bold mb-1.5">DNI Anverso</p>
-                    {frontImageDisplay ? (
-                      <img src={frontImageDisplay} alt="DNI Delantera" className="w-full aspect-[1.58/1] object-cover rounded-xl border border-border-dark" />
-                    ) : (
-                      <div className="aspect-[1.58/1] bg-panel-dark border border-dashed border-border-dark rounded-xl flex items-center justify-center text-xs text-gray-500">
-                        Sin foto
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="text-[9px] font-mono text-gray-400 uppercase font-bold mb-1.5">DNI Reverso</p>
-                    {backImageDisplay ? (
-                      <img src={backImageDisplay} alt="DNI Trasera" className="w-full aspect-[1.58/1] object-cover rounded-xl border border-border-dark" />
-                    ) : (
-                      <div className="aspect-[1.58/1] bg-panel-dark border border-dashed border-border-dark rounded-xl flex items-center justify-center text-xs text-gray-500">
-                        Sin foto
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* AUDITORÍA */}
+          {/* TAB 4: AUDITORÍA */}
           {activeTab === 'audit' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-border-dark">
@@ -717,7 +795,7 @@ export default function SocioTemplate({
           )}
         </div>
 
-        {/* Panel Lateral de Datos de Contacto y Acciones */}
+        {/* Panel Lateral */}
         <div className="w-full md:w-80 bg-panel-dark p-4 sm:p-6 flex flex-col justify-between overflow-y-auto shrink-0 space-y-4">
           <div className="space-y-4">
             <div>
@@ -752,72 +830,14 @@ export default function SocioTemplate({
               </div>
             </div>
 
-            {/* SECCIÓN DE PDF FIRMADO */}
-            <div className="pt-3 border-t border-border-dark space-y-2">
-              <input
-                ref={pdfInputRef}
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={handleUploadSignedPdf}
-              />
-
-              <div className="p-3 bg-brand-dark/80 rounded-xl border border-border-dark space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-gray-200">
-                  <span className="flex items-center gap-1.5 uppercase text-[10px] font-mono text-gray-400">
-                    <FileCheck size={13} className="text-emerald-400" /> PDF Firmado
-                  </span>
-                  {signedPdfData ? (
-                    <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono font-bold">
-                      GUARDADO
-                    </span>
-                  ) : (
-                    <span className="text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-mono font-bold">
-                      PENDIENTE
-                    </span>
-                  )}
-                </div>
-
-                {signedPdfData ? (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleDownloadSignedPdf}
-                      className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow"
-                    >
-                      <Eye size={12} /> Ver PDF
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => pdfInputRef.current?.click()}
-                      disabled={isUploadingPdf}
-                      className="p-1.5 bg-panel-dark border border-border-dark text-gray-300 rounded-lg text-xs font-bold"
-                    >
-                      <Upload size={12} />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => pdfInputRef.current?.click()}
-                    disabled={isUploadingPdf}
-                    className="w-full py-2 bg-brand-dark border border-dashed border-border-dark text-gray-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
-                  >
-                    {isUploadingPdf ? <RefreshCw size={12} className="animate-spin text-brand-red" /> : <Upload size={12} className="text-brand-red" />}
-                    <span>Subir PDF Firmado</span>
-                  </button>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(true)}
-                className="w-full h-9 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 text-rose-400 rounded-xl font-bold text-xs flex items-center justify-center gap-2"
-              >
-                <Trash2 size={13} />
-                Dar de Baja / Eliminar Socio
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="w-full h-9 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 text-rose-400 rounded-xl font-bold text-xs flex items-center justify-center gap-2 mt-4"
+            >
+              <Trash2 size={13} />
+              Dar de Baja / Eliminar Socio
+            </button>
           </div>
 
           <div className="space-y-2 pt-3 border-t border-border-dark">
@@ -832,7 +852,12 @@ export default function SocioTemplate({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={handleCopyDetails}
+                onClick={() => {
+                  const text = `Socio: ${currentMember.firstName} ${currentMember.lastName}\nDoc: ${currentMember.documentType} ${currentMember.dniPassport}\nNacionalidad: ${currentMember.nationality}`;
+                  navigator.clipboard.writeText(text);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
                 className="h-8 bg-gray-900 border border-border-dark text-gray-300 rounded-xl font-semibold text-xs flex items-center justify-center gap-1"
               >
                 {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
@@ -841,7 +866,16 @@ export default function SocioTemplate({
 
               <button
                 type="button"
-                onClick={handleExportCSV}
+                onClick={() => {
+                  const csvContent = `data:text/csv;charset=utf-8,"ID","DNI","Nombre","Apellidos"\n"${currentMember.id}","${currentMember.dniPassport}","${currentMember.firstName}","${currentMember.lastName}"`;
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement("a");
+                  link.setAttribute("href", encodedUri);
+                  link.setAttribute("download", `socio_${currentMember.dniPassport}.csv`);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
                 className="h-8 bg-gray-900 border border-border-dark text-gray-300 rounded-xl font-semibold text-xs flex items-center justify-center gap-1"
               >
                 <Download size={12} /> CSV

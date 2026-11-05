@@ -15,11 +15,127 @@ import {
   AlertCircle,
   Upload,
   Sparkles,
-  Phone
+  Phone,
+  Scale,
+  Receipt,
+  StickyNote,
+  Users,
+  CheckSquare,
+  Square,
+  Lock
 } from 'lucide-react';
 import { WorkerUser, ActivityLog } from '../types';
 import { supabase } from '../supabaseClient';
 import EmergencyContactsManager from './EmergencyContactsManager';
+
+export interface PermissionDefinition {
+  key: string;
+  label: string;
+  category: 'socios' | 'dispensario' | 'contabilidad' | 'comunicacion' | 'sistema';
+  description: string;
+}
+
+export const ALL_SYSTEM_PERMISSIONS: PermissionDefinition[] = [
+  // 1. MÓDULO DE SOCIOS
+  { 
+    key: 'register_users', 
+    label: 'Registrar Socios', 
+    category: 'socios', 
+    description: 'Dar de alta nuevos socios con formulario y captura fotográfica.' 
+  },
+  { 
+    key: 'view_all', 
+    label: 'Consultar Fichas', 
+    category: 'socios', 
+    description: 'Acceso al directorio completo, buscador y visualización de expedientes.' 
+  },
+  { 
+    key: 'edit_members', 
+    label: 'Modificar Datos de Socios', 
+    category: 'socios', 
+    description: 'Editar datos personales, teléfono, dirección y foto de socios.' 
+  },
+  { 
+    key: 'delete_records', 
+    label: 'Eliminar / Dar de Baja', 
+    category: 'socios', 
+    description: 'Eliminar y dar de baja permanentemente a socios del censo.' 
+  },
+  { 
+    key: 'manage_documents', 
+    label: 'Expediente & Documentos', 
+    category: 'socios', 
+    description: 'Subir, previsualizar y borrar contratos firmados, PDFs y escaneos.' 
+  },
+  { 
+    key: 'export_data', 
+    label: 'Exportar Datos & PDFs', 
+    category: 'socios', 
+    description: 'Descargar contratos de alta en PDF individual y exportación masiva.' 
+  },
+
+  // 2. MÓDULO DE DISPENSARIO & VARIEDADES
+  { 
+    key: 'dispense_cannabis', 
+    label: 'Dispensar Jornada', 
+    category: 'dispensario', 
+    description: 'Registrar entregas de gramos y cierres diarios de jornada.' 
+  },
+  { 
+    key: 'manage_catalog', 
+    label: 'Catálogo & Variedades', 
+    category: 'dispensario', 
+    description: 'Añadir nuevas variedades, editar precios por gramo y stock.' 
+  },
+  { 
+    key: 'modify_dispensations', 
+    label: 'Editar / Anular Cierres', 
+    category: 'dispensario', 
+    description: 'Modificar cantidades o anular registros erróneos del inventario.' 
+  },
+
+  // 3. MÓDULO DE CONTABILIDAD & GASTOS
+  { 
+    key: 'view_expenses', 
+    label: 'Ver Contabilidad', 
+    category: 'contabilidad', 
+    description: 'Consultar libro de gastos, KPIs financieros y desglose por conceptos.' 
+  },
+  { 
+    key: 'manage_expenses', 
+    label: 'Registrar & Borrar Gastos', 
+    category: 'contabilidad', 
+    description: 'Añadir facturas, compras de suministros, editar y suprimir asientos.' 
+  },
+
+  // 4. NOTAS & COMUNICACIÓN
+  { 
+    key: 'manage_notes', 
+    label: 'Notas de Equipo (Sticky)', 
+    category: 'comunicacion', 
+    description: 'Publicar notas adhesivas, editar contenido y archivar avisos.' 
+  },
+  { 
+    key: 'send_push', 
+    label: 'Enviar Alertas Push', 
+    category: 'comunicacion', 
+    description: 'Emitir avisos prioritarios y notificaciones en tiempo real.' 
+  },
+
+  // 5. SEGURIDAD & ADMINISTRACIÓN
+  { 
+    key: 'manage_workers', 
+    label: 'Gestionar Personal', 
+    category: 'sistema', 
+    description: 'Crear trabajadores, cambiar nombres, claves y permisos de acceso.' 
+  },
+  { 
+    key: 'manage_emergency', 
+    label: 'Contactos WhatsApp Alerta', 
+    category: 'sistema', 
+    description: 'Añadir, pausar y editar teléfonos que reciben la señal del botón de pánico.' 
+  }
+];
 
 interface WorkersPanelProps {
   adminWorker: WorkerUser;
@@ -45,7 +161,10 @@ export default function WorkersPanel({
   onUpdateAppSettings
 }: WorkersPanelProps) {
   const [activeTab, setActiveTab] = useState<'workers' | 'settings' | 'logs' | 'emergency'>('workers');
-  const [editingPermissionsId, setEditingPermissionsId] = useState<string | null>(null);
+
+  // Modales
+  const [selectedWorkerForPerms, setSelectedWorkerForPerms] = useState<WorkerUser | null>(null);
+  const [permCategoryFilter, setPermCategoryFilter] = useState<'all' | 'socios' | 'dispensario' | 'contabilidad' | 'comunicacion' | 'sistema'>('all');
 
   const [editAppName, setEditAppName] = useState<string>(appName || 'SVADHISTHANA');
   const [editAppLogo, setEditAppLogo] = useState<string | null>(appLogo);
@@ -67,23 +186,34 @@ export default function WorkersPanel({
   const [nameMessage, setNameMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isUpdatingName, setIsUpdatingName] = useState(false);
 
-  const availablePermissions = [
-    { key: 'register_users', label: 'Registrar Socios' },
-    { key: 'view_all', label: 'Consultar Fichas' },
-    { key: 'send_push', label: 'Enviar Notificaciones' },
-    { key: 'manage_workers', label: 'Gestionar Personal' },
-    { key: 'export_data', label: 'Exportar Datos' },
-    { key: 'delete_records', label: 'Eliminar Registros' }
-  ];
-
-  const handlePermissionToggle = (worker: WorkerUser, permission: string) => {
-    let newPermissions = [...(worker.permissions || [])];
-    if (newPermissions.includes(permission)) {
-      newPermissions = newPermissions.filter(p => p !== permission);
+  const handlePermissionToggle = (worker: WorkerUser, permissionKey: string) => {
+    let currentPerms = [...(worker.permissions || [])];
+    if (currentPerms.includes(permissionKey)) {
+      currentPerms = currentPerms.filter(p => p !== permissionKey);
     } else {
-      newPermissions.push(permission);
+      currentPerms.push(permissionKey);
     }
-    onUpdateWorker(worker.id, { permissions: newPermissions });
+
+    onUpdateWorker(worker.id, { permissions: currentPerms });
+
+    if (selectedWorkerForPerms && selectedWorkerForPerms.id === worker.id) {
+      setSelectedWorkerForPerms({ ...selectedWorkerForPerms, permissions: currentPerms });
+    }
+  };
+
+  const handleGrantAllPermissions = (worker: WorkerUser) => {
+    const allKeys = ALL_SYSTEM_PERMISSIONS.map(p => p.key);
+    onUpdateWorker(worker.id, { permissions: allKeys });
+    if (selectedWorkerForPerms && selectedWorkerForPerms.id === worker.id) {
+      setSelectedWorkerForPerms({ ...selectedWorkerForPerms, permissions: allKeys });
+    }
+  };
+
+  const handleRevokeAllPermissions = (worker: WorkerUser) => {
+    onUpdateWorker(worker.id, { permissions: [] });
+    if (selectedWorkerForPerms && selectedWorkerForPerms.id === worker.id) {
+      setSelectedWorkerForPerms({ ...selectedWorkerForPerms, permissions: [] });
+    }
   };
 
   const handleRoleToggle = (worker: WorkerUser) => {
@@ -209,10 +339,17 @@ export default function WorkersPanel({
     }
   };
 
+  const filteredPermissions = ALL_SYSTEM_PERMISSIONS.filter(p => {
+    if (permCategoryFilter === 'all') return true;
+    return p.category === permCategoryFilter;
+  });
+
   const safeAppName = editAppName || appName || 'SVADHISTHANA';
 
   return (
     <div id="admin-workers-panel" className="bg-panel-dark border border-border-dark rounded-3xl p-4 sm:p-6 flex flex-col h-full relative">
+      
+      {/* Cabecera Principal del Panel */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-dark/60 pb-5 mb-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-brand-red/10 border border-brand-red/20 flex items-center justify-center text-brand-red shrink-0">
@@ -223,7 +360,7 @@ export default function WorkersPanel({
               Consola {safeAppName}
             </h4>
             <p className="text-xs text-gray-400 mt-0.5">
-              Personalización, usuarios y accesos
+              Personalización, usuarios y control granular de permisos
             </p>
           </div>
         </div>
@@ -267,14 +404,15 @@ export default function WorkersPanel({
         </div>
       </div>
 
+      {/* PESTAÑA: TRABAJADORES */}
       {activeTab === 'workers' && (
         <div className="flex-1 flex flex-col space-y-3">
           
-          {/* VISTA MÓVIL: Tarjetas de Trabajadores (< md) */}
+          {/* VISTA MÓVIL (< md) */}
           <div className="md:hidden space-y-3">
             {workers.map(worker => {
               const isSelf = worker.id === adminWorker.id;
-              const isEditingPermissions = editingPermissionsId === worker.id;
+              const permsCount = worker.permissions?.length || 0;
 
               return (
                 <div key={worker.id} className="bg-brand-dark border border-border-dark rounded-2xl p-4 space-y-3">
@@ -300,6 +438,7 @@ export default function WorkersPanel({
                           setNameMessage(null);
                         }}
                         className="p-1.5 rounded-lg bg-panel-dark text-emerald-400 border border-border-dark"
+                        title="Cambiar Nombre"
                       >
                         <Edit3 size={13} />
                       </button>
@@ -310,6 +449,7 @@ export default function WorkersPanel({
                           setPassMessage(null);
                         }}
                         className="p-1.5 rounded-lg bg-panel-dark text-amber-400 border border-border-dark"
+                        title="Cambiar Contraseña"
                       >
                         <KeyRound size={13} />
                       </button>
@@ -317,6 +457,7 @@ export default function WorkersPanel({
                         disabled={isSelf}
                         onClick={() => onDeleteWorker(worker.id)}
                         className={`p-1.5 rounded-lg border border-border-dark ${isSelf ? 'text-gray-700' : 'text-rose-400 bg-panel-dark'}`}
+                        title="Eliminar Trabajador"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -345,39 +486,23 @@ export default function WorkersPanel({
                       {worker.active ? 'ACTIVO' : 'PENDIENTE'}
                     </button>
 
+                    {/* BOTÓN PARA ABRIR EL MODAL DE PERMISOS */}
                     <button 
-                      disabled={isSelf}
-                      onClick={() => setEditingPermissionsId(isEditingPermissions ? null : worker.id)}
-                      className="px-2 py-0.5 bg-panel-dark border border-border-dark text-gray-300 rounded text-[10px] font-semibold flex items-center gap-1"
+                      onClick={() => {
+                        setSelectedWorkerForPerms(worker);
+                        setPermCategoryFilter('all');
+                      }}
+                      className="px-2.5 py-1 bg-panel-dark hover:bg-gray-800 border border-border-dark hover:border-emerald-500/40 text-emerald-400 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1 transition-all"
                     >
-                      <Sliders size={10} /> {worker.permissions?.length || 0} Permisos
+                      <Sliders size={11} /> {permsCount} Permisos
                     </button>
                   </div>
-
-                  {isEditingPermissions && (
-                    <div className="pt-2 border-t border-border-dark flex flex-wrap gap-1 bg-black/40 p-2 rounded-xl">
-                      {availablePermissions.map(p => {
-                        const hasPerm = worker.permissions?.includes(p.key);
-                        return (
-                          <button
-                            key={p.key}
-                            onClick={() => handlePermissionToggle(worker, p.key)}
-                            className={`px-2 py-1 rounded text-[10px] font-medium flex items-center gap-1 ${
-                              hasPerm ? 'bg-brand-red/20 text-brand-red border border-brand-red/35' : 'bg-gray-900 text-gray-500'
-                            }`}
-                          >
-                            {hasPerm && <Check size={8} />} {p.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
 
-          {/* VISTA ESCRITORIO: Tabla Completa (>= md) */}
+          {/* VISTA ESCRITORIO (>= md) */}
           <div className="hidden md:block flex-1 overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[720px]">
               <thead>
@@ -385,14 +510,14 @@ export default function WorkersPanel({
                   <th className="pb-3 pl-2">Personal / Usuario</th>
                   <th className="pb-3">Rol</th>
                   <th className="pb-3">Estado Acceso</th>
-                  <th className="pb-3 text-center">Permisos</th>
+                  <th className="pb-3 text-center">Permisos del Sistema</th>
                   <th className="pb-3 text-right pr-2">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-dark/40 text-xs">
                 {workers.map(worker => {
                   const isSelf = worker.id === adminWorker.id;
-                  const isEditingPermissions = editingPermissionsId === worker.id;
+                  const permsCount = worker.permissions?.length || 0;
 
                   return (
                     <tr key={worker.id} className="hover:bg-brand-dark/25 transition-colors group">
@@ -448,40 +573,18 @@ export default function WorkersPanel({
                       </td>
 
                       <td className="py-3.5 text-center">
-                        {isEditingPermissions ? (
-                          <div className="inline-flex flex-wrap gap-1 max-w-[280px] p-2 bg-black/40 border border-border-dark rounded-xl text-[10px]">
-                            {availablePermissions.map(p => {
-                              const hasPerm = worker.permissions?.includes(p.key);
-                              return (
-                                <button
-                                  key={p.key}
-                                  onClick={() => handlePermissionToggle(worker, p.key)}
-                                  className={`px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-all ${
-                                    hasPerm 
-                                      ? 'bg-brand-red/20 text-brand-red border border-brand-red/35' 
-                                      : 'bg-gray-900 text-gray-500 border border-transparent hover:border-gray-700'
-                                  }`}
-                                >
-                                  {hasPerm && <Check size={8} />} {p.label}
-                                </button>
-                              );
-                            })}
-                            <button 
-                              onClick={() => setEditingPermissionsId(null)}
-                              className="px-2 py-0.5 bg-gray-800 text-white font-bold rounded"
-                            >
-                              Listo
-                            </button>
-                          </div>
-                        ) : (
-                          <button 
-                            disabled={isSelf}
-                            onClick={() => setEditingPermissionsId(worker.id)}
-                            className="px-3 py-1 bg-gray-900 hover:bg-brand-dark text-gray-300 font-semibold border border-border-dark rounded-lg flex items-center gap-1.5 mx-auto transition-all text-[11px]"
-                          >
-                            <Sliders size={11} /> {worker.permissions?.length || 0} Permisos
-                          </button>
-                        )}
+                        <button 
+                          onClick={() => {
+                            setSelectedWorkerForPerms(worker);
+                            setPermCategoryFilter('all');
+                          }}
+                          className="px-3.5 py-1.5 bg-gray-900 hover:bg-brand-dark hover:border-emerald-500/40 text-emerald-400 font-mono font-bold border border-border-dark rounded-xl inline-flex items-center gap-1.5 transition-all text-xs shadow-sm hover:scale-102"
+                          title="Gestionar permisos detallados"
+                        >
+                          <Sliders size={13} className="text-emerald-400" />
+                          <span>{permsCount} Permisos</span>
+                          <span className="text-[10px] text-gray-500">/ {ALL_SYSTEM_PERMISSIONS.length}</span>
+                        </button>
                       </td>
 
                       <td className="py-3.5 text-right pr-2">
@@ -534,7 +637,7 @@ export default function WorkersPanel({
         </div>
       )}
 
-      {/* BRANDING DEL APP */}
+      {/* PESTAÑA: BRANDING */}
       {activeTab === 'settings' && (
         <form onSubmit={handleSaveAppSettings} className="max-w-xl mx-auto w-full space-y-6 py-2 text-xs">
           <div className="bg-brand-dark p-4 sm:p-5 border border-border-dark rounded-2xl space-y-4">
@@ -617,7 +720,7 @@ export default function WorkersPanel({
         </form>
       )}
 
-      {/* AUDITORÍA */}
+      {/* PESTAÑA: AUDITORÍA */}
       {activeTab === 'logs' && (
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-4">
@@ -660,10 +763,195 @@ export default function WorkersPanel({
         </div>
       )}
 
-      {/* DESTINATARIOS WHATSAPP DE EMERGENCIA */}
+      {/* PESTAÑA: WHATSAPP DE EMERGENCIA */}
       {activeTab === 'emergency' && (
         <div className="flex-1">
           <EmergencyContactsManager />
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL COMPLETO DE GESTIÓN DE PERMISOS */}
+      {/* ======================================================== */}
+      {selectedWorkerForPerms && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-5 sm:p-7 max-w-2xl w-full relative space-y-4 shadow-2xl max-h-[92vh] flex flex-col">
+            
+            {/* Cabecera del Modal */}
+            <div className="flex items-start justify-between border-b border-[#1a2a1e] pb-3.5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-mono font-bold bg-[#1a2a1e] text-emerald-400 px-2 py-0.5 rounded uppercase tracking-widest border border-emerald-500/20">
+                    CONTROL DE ACCESOS
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-400 uppercase font-bold">
+                    Rol: {selectedWorkerForPerms.role}
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-white uppercase mt-1 flex items-center gap-2">
+                  <Sliders size={18} className="text-emerald-400" />
+                  Permisos de: {selectedWorkerForPerms.name}
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Concede o revoca funciones operativas para este trabajador.
+                </p>
+              </div>
+
+              <button 
+                onClick={() => setSelectedWorkerForPerms(null)} 
+                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-[#1a2a1e] transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Acciones Rápidas y Filtros por Categoría */}
+            <div className="space-y-2.5 pt-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-mono font-bold text-emerald-400">
+                  {selectedWorkerForPerms.permissions?.length || 0} de {ALL_SYSTEM_PERMISSIONS.length} permisos habilitados
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleGrantAllPermissions(selectedWorkerForPerms)}
+                    className="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 hover:border-emerald-500 text-emerald-300 hover:text-white rounded-lg text-[10px] font-mono font-bold uppercase transition-all"
+                  >
+                    Conceder Todos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRevokeAllPermissions(selectedWorkerForPerms)}
+                    className="px-2.5 py-1 bg-rose-500/15 hover:bg-rose-600 border border-rose-500/30 text-rose-400 hover:text-white rounded-lg text-[10px] font-mono font-bold uppercase transition-all"
+                  >
+                    Revocar Todos
+                  </button>
+                </div>
+              </div>
+
+              {/* Pestañas de Categoría */}
+              <div className="flex p-1 bg-[#080d0a] rounded-xl border border-[#1a2a1e] overflow-x-auto text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPermCategoryFilter('all')}
+                  className={`px-3 py-1 rounded-lg font-bold uppercase text-[10px] transition-all whitespace-nowrap ${
+                    permCategoryFilter === 'all' ? 'bg-[#1a2a1e] text-emerald-400 border border-emerald-500/30 shadow' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Todos ({ALL_SYSTEM_PERMISSIONS.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPermCategoryFilter('socios')}
+                  className={`px-3 py-1 rounded-lg font-bold uppercase text-[10px] transition-all whitespace-nowrap ${
+                    permCategoryFilter === 'socios' ? 'bg-[#1a2a1e] text-emerald-400 border border-emerald-500/30 shadow' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Socios (6)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPermCategoryFilter('dispensario')}
+                  className={`px-3 py-1 rounded-lg font-bold uppercase text-[10px] transition-all whitespace-nowrap ${
+                    permCategoryFilter === 'dispensario' ? 'bg-[#1a2a1e] text-emerald-400 border border-emerald-500/30 shadow' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Dispensario (3)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPermCategoryFilter('contabilidad')}
+                  className={`px-3 py-1 rounded-lg font-bold uppercase text-[10px] transition-all whitespace-nowrap ${
+                    permCategoryFilter === 'contabilidad' ? 'bg-[#1a2a1e] text-emerald-400 border border-emerald-500/30 shadow' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Gastos (2)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPermCategoryFilter('comunicacion')}
+                  className={`px-3 py-1 rounded-lg font-bold uppercase text-[10px] transition-all whitespace-nowrap ${
+                    permCategoryFilter === 'comunicacion' ? 'bg-[#1a2a1e] text-emerald-400 border border-emerald-500/30 shadow' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Notas / Push (2)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPermCategoryFilter('sistema')}
+                  className={`px-3 py-1 rounded-lg font-bold uppercase text-[10px] transition-all whitespace-nowrap ${
+                    permCategoryFilter === 'sistema' ? 'bg-[#1a2a1e] text-emerald-400 border border-emerald-500/30 shadow' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Sistema (2)
+                </button>
+              </div>
+            </div>
+
+            {/* Lista Cuadrícula de Permisos Interactivos */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[50vh]">
+              {filteredPermissions.map(perm => {
+                const isGranted = selectedWorkerForPerms.permissions?.includes(perm.key);
+
+                return (
+                  <div
+                    key={perm.key}
+                    onClick={() => handlePermissionToggle(selectedWorkerForPerms, perm.key)}
+                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
+                      isGranted 
+                        ? 'bg-[#101b13] border-emerald-500/40 shadow-sm' 
+                        : 'bg-[#080d0a] border-[#1a2a1e] hover:border-gray-700 opacity-65'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <div className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border ${
+                        isGranted ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-gray-900 text-gray-600 border-[#1a2a1e]'
+                      }`}>
+                        {isGranted ? <Check size={14} /> : <X size={13} />}
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className={`text-xs font-bold ${isGranted ? 'text-white' : 'text-gray-400'}`}>
+                            {perm.label}
+                          </h4>
+                          <span className="text-[9px] font-mono text-gray-500 uppercase">
+                            ({perm.key})
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
+                          {perm.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 pt-0.5">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${
+                        isGranted 
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                          : 'bg-gray-900 text-gray-500 border-border-dark'
+                      }`}>
+                        {isGranted ? 'ACTIVO' : 'REVOCADO'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pie del Modal */}
+            <div className="pt-3 border-t border-[#1a2a1e] flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedWorkerForPerms(null)}
+                className="h-10 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase rounded-xl shadow-lg transition-all"
+              >
+                Listo / Guardar
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
 

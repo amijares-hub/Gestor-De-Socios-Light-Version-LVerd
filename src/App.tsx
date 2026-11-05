@@ -379,7 +379,8 @@ export default function App() {
           address: formAddress.trim() || null,
           registration_status: 'approved',
           registered_by: validWorkerId,
-          dni_front_image: formDniFront
+          dni_front_image: formDniFront,
+          member_photo: formDniFront
         }])
         .select()
         .single();
@@ -663,7 +664,12 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <PanicButton currentWorker={workerSession} locationLabel="Panel de Administrador" />
+          {/* BOTÓN DE PÁNICO CON CIERRE INMEDIATO DE SESIÓN Y BLOQUEO */}
+          <PanicButton 
+            currentWorker={workerSession} 
+            locationLabel="Panel de Administrador" 
+            onPanicTriggered={handleLogout}
+          />
           <div className="text-right">
             <p className="text-xs font-bold text-white leading-none truncate max-w-[100px] sm:max-w-none">{workerSession.name}</p>
             <p className="text-[9px] font-mono text-gray-500 uppercase">{workerSession.role}</p>
@@ -799,7 +805,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ALTA SOCIO ADMIN */}
+        {/* ALTA SOCIO ADMIN (1 SOLA FOTO) */}
         {activeTab === 'register' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
             

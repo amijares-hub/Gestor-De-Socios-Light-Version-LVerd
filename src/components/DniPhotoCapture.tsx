@@ -3,9 +3,7 @@ import { Camera, CameraOff, Upload, CheckCircle2, Trash2, User, SwitchCamera, Re
 
 interface DniPhotoCaptureProps {
   frontImage: string | null;
-  backImage?: string | null;
   onChangeFront: (base64: string | null) => void;
-  onChangeBack?: (base64: string | null) => void;
 }
 
 export default function DniPhotoCapture({
@@ -64,13 +62,12 @@ export default function DniPhotoCapture({
     ];
 
     let acquiredStream: MediaStream | null = null;
-
     for (const constraints of constraintOptions) {
       try {
         acquiredStream = await navigator.mediaDevices.getUserMedia(constraints);
         if (acquiredStream) break;
       } catch (e) {
-        // Fallback al siguiente constraint
+        // Fallback
       }
     }
 
@@ -150,7 +147,7 @@ export default function DniPhotoCapture({
         <div className="flex items-center gap-2">
           <User className="text-brand-red shrink-0" size={16} />
           <h4 className="text-[11px] sm:text-xs font-display font-bold text-white uppercase tracking-wider">
-            Fotografía Oficial del Socio (Rostro)
+            Fotografía del Socio (1 Foto)
           </h4>
         </div>
         {frontImage && <CheckCircle2 size={14} className="text-emerald-400" />}
@@ -195,7 +192,7 @@ export default function DniPhotoCapture({
       ) : frontImage ? (
         <div className="space-y-3 text-center">
           <div className="w-32 h-32 sm:w-36 sm:h-36 mx-auto rounded-2xl overflow-hidden border-2 border-emerald-500/50 shadow-lg relative">
-            <img src={frontImage} alt="Rostro del Socio" className="w-full h-full object-cover" />
+            <img src={frontImage} alt="Foto del Socio" className="w-full h-full object-cover" />
           </div>
           <div className="flex justify-center gap-2 max-w-xs mx-auto">
             <button
@@ -230,14 +227,14 @@ export default function DniPhotoCapture({
             ) : (
               <>
                 <Camera size={15} className="text-brand-red" />
-                <span>Tomar Foto del Socio con Cámara</span>
+                <span>Tomar Foto del Socio</span>
               </>
             )}
           </button>
 
           <label className="w-full py-2 bg-panel-dark/60 hover:bg-panel-dark border border-dashed border-border-dark rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all">
             <Upload size={14} className="text-gray-400" />
-            <span className="text-[10px] font-mono text-gray-400 font-bold uppercase">Subir Foto desde Galería</span>
+            <span className="text-[10px] font-mono text-gray-400 font-bold uppercase">Subir Foto (1 Foto)</span>
             <input
               type="file"
               accept="image/*"

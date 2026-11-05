@@ -15,7 +15,7 @@ export type DocumentType = 'DNI' | 'PASSPORT' | 'NIE';
 
 export interface AssociationMember {
   id: string;
-  memberNumber?: string; // Número de socio alfanumérico único (Ej: SOC-K9P2X4)
+  memberNumber?: string;
   dniPassport: string;
   documentType: DocumentType;
   firstName: string;
@@ -27,8 +27,7 @@ export interface AssociationMember {
   phone?: string;
   address?: string;
   gender?: 'MASCULINO' | 'FEMENINO' | 'OTRO';
-  memberPhoto?: string | null; // Fotografía del rostro del socio
-  // Compatibilidad con componentes existentes
+  memberPhoto?: string | null;
   dniFrontImage?: string | null;
   dni_front_image?: string | null;
   dniBackImage?: string | null;
@@ -43,6 +42,25 @@ export interface AssociationMember {
   };
 }
 
+export interface StickyNote {
+  id: string;
+  content: string;
+  priority: 'baja' | 'media' | 'alta' | 'urgente';
+  createdBy: string;
+  createdAt: string;
+  isArchived?: boolean;
+}
+
+export interface MemberDocument {
+  id: string;
+  memberId: string;
+  name: string;
+  fileType: 'pdf' | 'image' | 'doc';
+  fileUrl: string;
+  uploadedBy: string;
+  createdAt: string;
+}
+
 export interface RealTimeNotification {
   id: string;
   title: string;
@@ -52,31 +70,6 @@ export interface RealTimeNotification {
   senderRole?: WorkerRole | string;
   isPush?: boolean;
   priority?: 'high' | 'normal' | 'low';
-}
-
-export interface SupabaseConfig {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-  isConnected: boolean;
-}
-
-export interface FieldChange {
-  field: string;
-  label?: string;
-  from: any;
-  to: any;
-}
-
-export interface ActivityLog {
-  id: string;
-  timestamp: string;
-  workerName: string;
-  workerRole?: WorkerRole | string;
-  action: string;
-  details: string;
-  memberId?: string;
-  memberName?: string;
-  changes?: FieldChange[];
 }
 
 export interface CannabisProduct {
@@ -146,4 +139,16 @@ export interface Expense {
   expenseDate: string;
   createdBy?: string;
   createdAt?: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  timestamp: string;
+  workerName: string;
+  workerRole?: WorkerRole | string;
+  action: string;
+  details: string;
+  memberId?: string;
+  memberName?: string;
+  changes?: any[];
 }
