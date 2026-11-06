@@ -57,7 +57,7 @@ const mapMemberFromDB = (m: any): AssociationMember & { dniFrontImage?: string; 
     id: m.registered_by || 'admin',
     name: 'Sistema / Agente'
   },
-  dniFrontImage: m.dni_front_image || m.member_photo || null,
+  dniFrontImage: m.dni_front_image || null,
   dniBackImage: null
 });
 
@@ -363,6 +363,7 @@ export default function App() {
       const validWorkerId = isUuid ? workerSession?.id : null;
       const memberNumber = generateUniqueMemberNumber();
 
+      // Inserción sin 'member_photo' para evitar error de caché de esquema en Supabase
       const { data, error } = await supabase
         .from('members')
         .insert([{
@@ -379,8 +380,7 @@ export default function App() {
           address: formAddress.trim() || null,
           registration_status: 'approved',
           registered_by: validWorkerId,
-          dni_front_image: formDniFront,
-          member_photo: formDniFront
+          dni_front_image: formDniFront
         }])
         .select()
         .single();
@@ -441,7 +441,8 @@ export default function App() {
           email: updatedMember.email || null,
           phone: updatedMember.phone || null,
           address: updatedMember.address || null,
-          registration_status: updatedMember.registrationStatus
+          registration_status: updatedMember.registrationStatus,
+          dni_front_image: updatedMember.dniFrontImage || (updatedMember as any).dni_front_image || null
         })
         .eq('id', updatedMember.id)
         .select()

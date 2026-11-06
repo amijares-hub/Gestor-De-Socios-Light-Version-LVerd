@@ -185,6 +185,7 @@ export default function WorkerPortal({
         autoMemberNum += chars.charAt(Math.floor(Math.random() * chars.length));
       }
 
+      // Inserción sin 'member_photo' para evitar error de caché de esquema en Supabase
       const { data, error } = await supabase
         .from('members')
         .insert([{
@@ -201,8 +202,7 @@ export default function WorkerPortal({
           address: regAddress.trim() || null,
           registration_status: 'approved',
           registered_by: validWorkerId,
-          dni_front_image: dniFront,
-          member_photo: dniFront
+          dni_front_image: dniFront
         }])
         .select()
         .single();
@@ -226,7 +226,6 @@ export default function WorkerPortal({
         registerDate: data.created_at,
         registeredBy: { id: activeWorker.id, name: activeWorker.name },
         dniFrontImage: data.dni_front_image,
-        memberPhoto: data.dni_front_image,
         dniBackImage: null
       };
 
@@ -588,7 +587,7 @@ export default function WorkerPortal({
                         </div>
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-white truncate">{m.firstName} {m.lastName}</p>
-                          <p className="text-[10px] font-mono text-gray-400 truncate">{m.documentType}: {m.dniPassport}</p>
+                          <p className="text-[10px] font-mono text-gray-400 truncate">{m.documentType}: {formatMaskedDni(m.dniPassport, !!revealedDniIds[m.id])}</p>
                         </div>
                       </div>
 
