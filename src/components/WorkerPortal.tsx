@@ -4,13 +4,16 @@ import DniPhotoCapture from './DniPhotoCapture';
 import { 
   Users, UserPlus, Bell, User, Search, CheckCircle2, Clock, 
   RefreshCw, LogOut, FileText, Trash2, Home, Download, CheckSquare, Square,
-  Lock, ChevronRight, ChevronDown, ChevronUp, Eye, EyeOff, Sliders, Menu
+  Lock, ChevronRight, ChevronDown, ChevronUp, Eye, EyeOff, Sliders, Menu,
+  ShoppingBag
 } from 'lucide-react';
 import { AssociationMember, WorkerUser, RealTimeNotification, DocumentType } from '../types';
 import ConfirmModal from './ConfirmModal';
 import DuplicateWarningModal from './DuplicateWarningModal';
 import WorkerAlertPreferencesPanel, { WorkerPreferences, defaultWorkerPrefs } from './WorkerAlertPreferencesPanel';
 import PanicButton from './PanicButton';
+import DashboardStats from './DashboardStats';
+import ExpensesManager from './ExpensesManager';
 import { generateSvadhisthanaAltaPdf, exportBulkMembersPdf } from '../utils/pdfGenerator';
 
 export interface WorkerPortalProps {
@@ -27,7 +30,7 @@ export interface WorkerPortalProps {
   appLogo?: string | null;
 }
 
-export type PortalTab = 'home' | 'socios' | 'registro' | 'notificaciones' | 'perfil';
+export type PortalTab = 'home' | 'socios' | 'registro' | 'dispensario' | 'notificaciones' | 'perfil';
 
 export default function WorkerPortal({
   activeWorker,
@@ -135,7 +138,7 @@ export default function WorkerPortal({
   const [privacyMode, setPrivacyMode] = useState<boolean>(() => {
     return localStorage.getItem('laguna_worker_privacy_mode') !== 'false';
   });
-  const [revealedDniIds] = useState<Record<string, boolean>>({});
+  const [revealedDniIds, setRevealedDniIds] = useState<Record<string, boolean>>({});
   const [showPrefsInSocios, setShowPrefsInSocios] = useState<boolean>(false);
 
   const formatMaskedDni = (dni: string, isRevealed: boolean) => {
@@ -185,7 +188,6 @@ export default function WorkerPortal({
         autoMemberNum += chars.charAt(Math.floor(Math.random() * chars.length));
       }
 
-      // Inserción sin 'member_photo' para evitar error de caché de esquema en Supabase
       const { data, error } = await supabase
         .from('members')
         .insert([{
@@ -312,6 +314,7 @@ export default function WorkerPortal({
         onCancel={() => setMemberToDelete(null)}
       />
 
+      {/* Header Superior del Trabajador */}
       <header className="sticky top-0 z-30 bg-panel-dark/80 backdrop-blur-md border-b border-border-dark px-3 sm:px-6 md:px-8 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-600 flex items-center justify-center font-display font-black text-white text-xs shadow-lg overflow-hidden shrink-0">
@@ -354,6 +357,7 @@ export default function WorkerPortal({
         </div>
       </header>
 
+      {/* MENÚ ACORDEÓN DESPLEGABLE MÓVIL (< md) */}
       <div className="md:hidden bg-panel-dark border-b border-border-dark px-3 py-2.5">
         <button
           type="button"
@@ -366,6 +370,7 @@ export default function WorkerPortal({
               {activeTab === 'home' && 'Menú: Inicio'}
               {activeTab === 'socios' && `Menú: Socios (${members.length})`}
               {activeTab === 'registro' && 'Menú: Alta de Socio'}
+              {activeTab === 'dispensario' && 'Menú: Dispensario & Control'}
               {activeTab === 'notificaciones' && `Menú: Avisos (${notifications.length})`}
               {activeTab === 'perfil' && 'Menú: Mi Perfil'}
             </span>
@@ -378,11 +383,11 @@ export default function WorkerPortal({
             <button
               type="button"
               onClick={() => { setActiveTab('home'); setIsAccordionOpen(false); }}
-              className={`p-2.5 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
+              className={`p-2 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
                 activeTab === 'home' ? 'bg-panel-dark text-white border border-border-dark font-bold' : 'text-gray-400 hover:text-white'
               }`}
             >
-              <Home size={18} className="mb-1 text-emerald-400" />
+              <Home size={16} className="mb-1 text-emerald-400" />
               <span className="text-[10px] font-bold">Home</span>
             </button>
 
@@ -390,12 +395,12 @@ export default function WorkerPortal({
               <button
                 type="button"
                 onClick={() => { setActiveTab('socios'); setIsAccordionOpen(false); }}
-                className={`p-2.5 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
+                className={`p-2 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
                   activeTab === 'socios' ? 'bg-panel-dark text-white border border-border-dark font-bold' : 'text-gray-400 hover:text-white'
                 }`}
               >
-                <Users size={18} className="mb-1 text-blue-400" />
-                <span className="text-[10px] font-bold">Socios ({members.length})</span>
+                <Users size={16} className="mb-1 text-blue-400" />
+                <span className="text-[10px] font-bold">Socios</span>
               </button>
             )}
 
@@ -403,40 +408,53 @@ export default function WorkerPortal({
               <button
                 type="button"
                 onClick={() => { setActiveTab('registro'); setIsAccordionOpen(false); }}
-                className={`p-2.5 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
+                className={`p-2 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
                   activeTab === 'registro' ? 'bg-panel-dark text-white border border-border-dark font-bold' : 'text-gray-400 hover:text-white'
                 }`}
               >
-                <UserPlus size={18} className="mb-1 text-brand-red" />
-                <span className="text-[10px] font-bold">Alta Socio</span>
+                <UserPlus size={16} className="mb-1 text-brand-red" />
+                <span className="text-[10px] font-bold">Alta</span>
               </button>
             )}
+
+            {/* Acceso a Dispensario Móvil */}
+            <button
+              type="button"
+              onClick={() => { setActiveTab('dispensario'); setIsAccordionOpen(false); }}
+              className={`p-2 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
+                activeTab === 'dispensario' ? 'bg-panel-dark text-white border border-border-dark font-bold' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <ShoppingBag size={16} className="mb-1 text-emerald-400" />
+              <span className="text-[10px] font-bold">Dispensario</span>
+            </button>
 
             <button
               type="button"
               onClick={() => { setActiveTab('notificaciones'); setIsAccordionOpen(false); }}
-              className={`p-2.5 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
+              className={`p-2 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
                 activeTab === 'notificaciones' ? 'bg-panel-dark text-white border border-border-dark font-bold' : 'text-gray-400 hover:text-white'
               }`}
             >
-              <Bell size={18} className="mb-1 text-amber-400" />
-              <span className="text-[10px] font-bold">Avisos ({notifications.length})</span>
+              <Bell size={16} className="mb-1 text-amber-400" />
+              <span className="text-[10px] font-bold">Avisos</span>
             </button>
 
             <button
               type="button"
               onClick={() => { setActiveTab('perfil'); setIsAccordionOpen(false); }}
-              className={`p-2.5 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
+              className={`p-2 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
                 activeTab === 'perfil' ? 'bg-panel-dark text-white border border-border-dark font-bold' : 'text-gray-400 hover:text-white'
               }`}
             >
-              <User size={18} className="mb-1 text-purple-400" />
+              <User size={16} className="mb-1 text-purple-400" />
               <span className="text-[10px] font-bold">Perfil</span>
             </button>
           </div>
         )}
       </div>
 
+      {/* Menú de Navegación Escritorio (>= md) */}
       <nav className="hidden md:flex bg-panel-dark/40 border-b border-border-dark px-6 py-2 overflow-x-auto">
         <div className="flex items-center gap-1.5 max-w-7xl mx-auto w-full">
           <button
@@ -470,6 +488,16 @@ export default function WorkerPortal({
             </button>
           )}
 
+          {/* Botón Dispensario & Gastos Escritorio */}
+          <button
+            onClick={() => setActiveTab('dispensario')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'dispensario' ? 'bg-brand-red text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <ShoppingBag size={15} /> Dispensario & Control Diario
+          </button>
+
           <button
             onClick={() => setActiveTab('notificaciones')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -490,7 +518,10 @@ export default function WorkerPortal({
         </div>
       </nav>
 
+      {/* Contenedor Principal */}
       <main className="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-5 md:p-6 pb-28 md:pb-8">
+        
+        {/* TAB 0: HOME */}
         {activeTab === 'home' && (
           <div className="space-y-4 sm:space-y-6">
             <div className="relative overflow-hidden bg-panel-dark border border-border-dark rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 shadow-2xl">
@@ -510,6 +541,12 @@ export default function WorkerPortal({
                 </div>
 
                 <div className="flex flex-wrap gap-2 sm:gap-3">
+                  <button
+                    onClick={() => setActiveTab('dispensario')}
+                    className="flex-1 sm:flex-none h-10 sm:h-11 px-4 sm:px-5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-2 shadow-lg transition-all active:scale-98"
+                  >
+                    <ShoppingBag size={15} /> Dispensario
+                  </button>
                   {hasPermission('register_users') && (
                     <button
                       onClick={() => setActiveTab('registro')}
@@ -530,6 +567,7 @@ export default function WorkerPortal({
               </div>
             </div>
 
+            {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
               <div className="bg-panel-dark border border-border-dark rounded-2xl p-3.5 sm:p-5 flex flex-col justify-between">
                 <span className="text-[9px] sm:text-[10px] font-mono font-bold text-gray-400 uppercase">Total Socios</span>
@@ -564,6 +602,53 @@ export default function WorkerPortal({
               </div>
             </div>
 
+            {/* Tiles */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              <div 
+                onClick={() => setActiveTab('dispensario')}
+                className="bg-panel-dark border border-border-dark hover:border-emerald-500/60 rounded-2xl p-4 flex flex-col justify-between cursor-pointer active:scale-98 transition-all"
+              >
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-2">
+                    <ShoppingBag size={18} />
+                  </div>
+                  <h3 className="text-xs font-bold text-white">Dispensario & Control Diario</h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Control de variedades, pesajes y cierres.</p>
+                </div>
+              </div>
+
+              <div 
+                onClick={() => hasPermission('register_users') && setActiveTab('registro')}
+                className={`bg-panel-dark border border-border-dark rounded-2xl p-4 flex flex-col justify-between active:scale-98 transition-all ${
+                  hasPermission('register_users') ? 'cursor-pointer hover:border-brand-red/60' : 'opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-brand-red/10 text-brand-red flex items-center justify-center mb-2">
+                    <UserPlus size={18} />
+                  </div>
+                  <h3 className="text-xs font-bold text-white">Alta Socio con Foto</h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Captura la fotografía del socio con la cámara.</p>
+                </div>
+              </div>
+
+              <div 
+                onClick={() => hasPermission('view_all') && setActiveTab('socios')}
+                className={`bg-panel-dark border border-border-dark rounded-2xl p-4 flex flex-col justify-between active:scale-98 transition-all ${
+                  hasPermission('view_all') ? 'cursor-pointer hover:border-blue-500/60' : 'opacity-60 cursor-not-allowed'
+                }`}
+              >
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center mb-2">
+                    <Users size={18} />
+                  </div>
+                  <h3 className="text-xs font-bold text-white">Directorio Socios</h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Búsqueda rápida y exportación PDF.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Ultimos Socios */}
             <div className="bg-panel-dark border border-border-dark rounded-2xl overflow-hidden shadow-xl">
               <div className="p-3.5 border-b border-border-dark flex items-center justify-between">
                 <h3 className="text-xs font-display font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
@@ -587,7 +672,7 @@ export default function WorkerPortal({
                         </div>
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-white truncate">{m.firstName} {m.lastName}</p>
-                          <p className="text-[10px] font-mono text-gray-400 truncate">{m.documentType}: {formatMaskedDni(m.dniPassport, !!revealedDniIds[m.id])}</p>
+                          <p className="text-[10px] font-mono text-gray-400 truncate">{m.documentType}: {m.dniPassport}</p>
                         </div>
                       </div>
 
@@ -605,6 +690,7 @@ export default function WorkerPortal({
           </div>
         )}
 
+        {/* TAB 1: SOCIOS */}
         {activeTab === 'socios' && (
           hasPermission('view_all') ? (
             <div className="space-y-4">
@@ -739,6 +825,7 @@ export default function WorkerPortal({
           )
         )}
 
+        {/* TAB 2: ALTA SOCIO */}
         {activeTab === 'registro' && (
           hasPermission('register_users') ? (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
@@ -854,6 +941,15 @@ export default function WorkerPortal({
           )
         )}
 
+        {/* TAB 3: DISPENSARIO & GASTOS OPERATIVOS (TRABAJADOR OPERA 100% VARIEDADES / AUDITORÍA LECTURA) */}
+        {activeTab === 'dispensario' && (
+          <div className="space-y-6">
+            <DashboardStats members={members} currentWorker={activeWorker} />
+            <ExpensesManager currentWorker={activeWorker} />
+          </div>
+        )}
+
+        {/* TAB 4: NOTIFICACIONES */}
         {activeTab === 'notificaciones' && (
           <div className="bg-panel-dark border border-border-dark rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider">Avisos Operativos</h3>
@@ -870,6 +966,7 @@ export default function WorkerPortal({
           </div>
         )}
 
+        {/* TAB 5: PERFIL */}
         {activeTab === 'perfil' && (
           <div className="bg-panel-dark border border-border-dark rounded-2xl p-5 sm:p-6 shadow-xl space-y-2 text-xs">
             <h3 className="font-bold text-white uppercase text-sm">Perfil de Operador</h3>

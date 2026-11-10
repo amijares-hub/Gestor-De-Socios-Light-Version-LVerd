@@ -10,10 +10,11 @@ import {
   X, 
   Check, 
   RefreshCw,
-  FolderOpen
+  FolderOpen,
+  Lock
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
-import { Expense, ExpenseCategory } from '../types';
+import { Expense, ExpenseCategory, WorkerUser } from '../types';
 
 const PRESET_CATEGORIES: ExpenseCategory[] = [
   'Alquiler',
@@ -29,7 +30,15 @@ const PRESET_CATEGORIES: ExpenseCategory[] = [
   'Otros'
 ];
 
-export default function ExpensesManager() {
+interface ExpensesManagerProps {
+  currentWorker?: WorkerUser | null;
+}
+
+export default function ExpensesManager({ currentWorker }: ExpensesManagerProps) {
+  // Permiso para modificar gastos: Admin o permiso explícito 'manage_expenses'
+  const isAdmin = !currentWorker || currentWorker.role === 'admin';
+  const canManageExpenses = isAdmin || (currentWorker?.permissions?.includes('manage_expenses') ?? false);
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [periodFilter, setPeriodFilter] = useState<'day' | 'week' | 'month' | 'year'>('month');
@@ -78,6 +87,10 @@ export default function ExpensesManager() {
   }, []);
 
   const handleOpenCreate = () => {
+    if (!canManageExpenses) {
+      alert("No dispones de permiso para registrar nuevos gastos.");
+      return;
+    }
     setEditingExpense(null);
     setFormCategory('Suministros varios (compras)');
     setFormCustomCategory('');
@@ -88,6 +101,10 @@ export default function ExpensesManager() {
   };
 
   const handleOpenEdit = (exp: Expense) => {
+    if (!canManageExpenses) {
+      alert("No dispones de permiso para modificar asientos de gasto.");
+      return;
+    }
     setEditingExpense(exp);
     setFormCategory(exp.category);
     setFormCustomCategory(exp.customCategory || '');
@@ -99,7 +116,9 @@ export default function ExpensesManager() {
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    const amountNum = parseFloat(formAmount);
+    if (!canManageExpenses) return;
+
+    const amountNum = parseFloat(formAmount.replace(',', '.'));
     if (isNaN(amountNum) || amountNum <= 0) {
       alert('Introduce un importe válido mayor a 0');
       return;
@@ -110,13 +129,15 @@ export default function ExpensesManager() {
       return;
     }
 
+    const authorName = currentWorker?.name || 'Administrador';
+
     const payload = {
       category: formCategory,
       custom_category: formCategory === 'Otros' ? formCustomCategory.trim() : null,
       description: formDescription.trim(),
       amount: amountNum,
       expense_date: formDate,
-      created_by: 'Administrador'
+      created_by: authorName
     };
 
     try {
@@ -141,6 +162,11 @@ export default function ExpensesManager() {
   };
 
   const handleDeleteExpense = async (exp: Expense) => {
+    if (!canManageExpenses) {
+      alert("No dispones de permiso para eliminar registros contables.");
+      return;
+    }
+
     const label = exp.category === 'Otros' && exp.customCategory ? exp.customCategory : exp.category;
     if (!confirm(`¿Eliminar el registro de gasto "${label}" por ${exp.amount.toFixed(2)} €?`)) return;
 
@@ -205,6 +231,11 @@ export default function ExpensesManager() {
             <span className="text-[9px] font-mono font-bold bg-[#1a2a1e] text-emerald-400 px-2 py-0.5 rounded uppercase tracking-widest border border-emerald-500/20">
               CONTABILIDAD & SUMINISTROS
             </span>
+            {!canManageExpenses && (
+              <span className="text-[9px] font-mono font-bold bg-[#080d0a] text-gray-400 px-2 py-0.5 rounded border border-[#1a2a1e] flex items-center gap-1">
+                <Lock size={10} className="text-amber-400" /> Solo Lectura
+              </span>
+            )}
           </div>
           <h3 className="text-base sm:text-lg font-display font-black text-white uppercase flex items-center gap-2 mt-1">
             <Receipt size={20} className="text-emerald-400" />
@@ -216,7 +247,7 @@ export default function ExpensesManager() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Selector de periodo: Día, Semana, Mes, Año */}
+          {/* Selector de periodo */}
           <div className="flex p-1 bg-[#080d0a] rounded-xl border border-[#1a2a1e]">
             <button
               type="button"
@@ -266,17 +297,20 @@ export default function ExpensesManager() {
             <RefreshCw size={15} className={isLoading ? 'animate-spin' : ''} />
           </button>
 
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="h-10 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase flex items-center gap-1.5 shadow-lg transition-all"
-          >
-            <Plus size={16} /> Registrar Gasto
-          </button>
+          {/* BOTÓN REGISTRAR GASTO: SOLO VISIBLE PARA QUIEN TIENE PERMISO */}
+          {canManageExpenses && (
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              className="h-10 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase flex items-center gap-1.5 shadow-lg transition-all"
+            >
+              <Plus size={16} /> Registrar Gasto
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Tarjetas KPI de Gastos */}
+      {/* Tarjetas KPI de Gastos (Los trabajadores pueden verlas) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-4 bg-[#080d0a] border border-[#1a2a1e] rounded-2xl flex items-center justify-between">
           <div>
@@ -350,7 +384,7 @@ export default function ExpensesManager() {
                   <th className="py-3 px-4">Concepto / Notas</th>
                   <th className="py-3 px-4 text-right">Importe (€)</th>
                   <th className="py-3 px-4 text-right">Registrado por</th>
-                  <th className="py-3 px-4 text-right">Acciones</th>
+                  {canManageExpenses && <th className="py-3 px-4 text-right">Acciones</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1a2a1e]">
@@ -376,26 +410,29 @@ export default function ExpensesManager() {
                     <td className="py-3 px-4 text-right font-mono text-[10px] text-gray-500">
                       {exp.createdBy}
                     </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(exp)}
-                          className="p-1.5 bg-[#0e1711] hover:bg-[#1a2a1e] border border-[#1a2a1e] rounded-lg text-gray-400 hover:text-emerald-400 transition-colors"
-                          title="Editar gasto"
-                        >
-                          <Edit3 size={13} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteExpense(exp)}
-                          className="p-1.5 bg-[#0e1711] hover:bg-rose-500/10 border border-[#1a2a1e] hover:border-rose-500/30 rounded-lg text-gray-400 hover:text-rose-400 transition-colors"
-                          title="Eliminar gasto"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
+                    {/* ACCIONES: EDITAR Y BORRAR SOLO VISIBLES PARA USUARIO AUTORIZADO */}
+                    {canManageExpenses && (
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(exp)}
+                            className="p-1.5 bg-[#0e1711] hover:bg-[#1a2a1e] border border-[#1a2a1e] rounded-lg text-gray-400 hover:text-emerald-400 transition-colors"
+                            title="Editar gasto"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteExpense(exp)}
+                            className="p-1.5 bg-[#0e1711] hover:bg-rose-500/10 border border-[#1a2a1e] hover:border-rose-500/30 rounded-lg text-gray-400 hover:text-rose-400 transition-colors"
+                            title="Eliminar gasto"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -405,8 +442,8 @@ export default function ExpensesManager() {
       </div>
 
       {/* Modal Registrar / Editar Gasto */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+      {isModalOpen && canManageExpenses && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-6 max-w-md w-full relative space-y-4 shadow-2xl">
             <button 
               type="button"
@@ -439,7 +476,6 @@ export default function ExpensesManager() {
                 </select>
               </div>
 
-              {/* Campo para escribir si se selecciona 'Otros' */}
               {formCategory === 'Otros' && (
                 <div>
                   <label className="block text-[10px] font-mono text-gray-400 uppercase font-bold mb-1">
@@ -462,9 +498,8 @@ export default function ExpensesManager() {
                     Importe (€) *
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
+                    type="text"
+                    inputMode="decimal"
                     required
                     value={formAmount}
                     onChange={(e) => setFormAmount(e.target.value)}

@@ -91,6 +91,7 @@ export interface DispensationLog {
   memberNumber: string;
   memberName: string;
   grams: number;
+  realWeight?: number;
   totalPrice: number;
   dispensedBy: string;
   createdAt: string;

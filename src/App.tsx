@@ -18,7 +18,6 @@ import { supabase } from './supabaseClient';
 import { WorkerUser, AssociationMember, RealTimeNotification, ActivityLog, PanicAlert } from './types';
 import SocioTemplate from './components/SocioTemplate';
 import WorkersPanel from './components/WorkersPanel';
-import WorkerPortal from './components/WorkerPortal';
 import DuplicateWarningModal from './components/DuplicateWarningModal';
 import DashboardStats from './components/DashboardStats';
 import DniPhotoCapture from './components/DniPhotoCapture';
@@ -104,7 +103,7 @@ export default function App() {
 
   const [selectedMember, setSelectedMember] = useState<AssociationMember | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all');
   const [docTypeFilter] = useState<'all' | 'DNI' | 'PASSPORT'>('all');
 
   const [privacyMode] = useState<boolean>(() => {
@@ -339,6 +338,11 @@ export default function App() {
     setFormError(null);
     setFormSuccess(null);
 
+    if (workerSession?.role !== 'admin' && !workerSession?.permissions?.includes('register_users')) {
+      setFormError('No tienes permiso para dar de alta socios.');
+      return;
+    }
+
     const cleanDoc = formDniPassport.trim().toUpperCase();
     if (!cleanDoc || !formFirstName.trim() || !formLastName.trim()) {
       setFormError('Por favor, completa los campos obligatorios (*).');
@@ -363,7 +367,6 @@ export default function App() {
       const validWorkerId = isUuid ? workerSession?.id : null;
       const memberNumber = generateUniqueMemberNumber();
 
-      // Inserción sin 'member_photo' para evitar error de caché de esquema en Supabase
       const { data, error } = await supabase
         .from('members')
         .insert([{
@@ -410,6 +413,11 @@ export default function App() {
   };
 
   const handleDeleteMember = async (id: string, skipConfirm = false) => {
+    if (workerSession?.role !== 'admin' && !workerSession?.permissions?.includes('delete_records')) {
+      alert("No dispones de permiso para dar de baja socios.");
+      return false;
+    }
+
     if (!skipConfirm && !confirm("¿Estás seguro de dar de baja este socio permanentemente?")) return false;
 
     try {
@@ -597,40 +605,14 @@ export default function App() {
     );
   }
 
-  if (workerSession.role !== 'admin') {
-    return (
-      <>
-        <WorkerPortal 
-          activeWorker={workerSession}
-          members={members}
-          onSelectMember={(member) => setSelectedMember(member)}
-          onMemberRegistered={(newMember) => setMembers(prev => [newMember, ...prev])}
-          onLogout={handleLogout}
-          notifications={notifications}
-          realtimeConnected={true}
-          onUpdateMember={handleUpdateMember}
-          onDeleteMember={handleDeleteMember}
-          appName={appName}
-          appLogo={appLogo}
-        />
-
-        {selectedMember && (
-          <SocioTemplate 
-            member={selectedMember}
-            onClose={() => setSelectedMember(null)}
-            onUpdateMember={handleUpdateMember}
-            onDeleteMember={handleDeleteMember}
-            currentWorker={workerSession}
-          />
-        )}
-      </>
-    );
-  }
+  // Layout unificado para Admin y Trabajadores
+  const isAdmin = workerSession.role === 'admin';
+  const canManageWorkers = isAdmin || (workerSession.permissions?.includes('manage_workers') ?? false);
 
   return (
     <div className="min-h-screen bg-brand-dark flex flex-col relative text-gray-200">
       
-      {/* Header Superior Admin */}
+      {/* Header Superior */}
       <header className="h-16 border-b border-border-dark bg-panel-dark/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-black text-white text-xs overflow-hidden shadow shrink-0">
@@ -638,37 +620,45 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xs sm:text-sm font-black text-white uppercase truncate max-w-[130px] sm:max-w-none">{appName}</h1>
-            <p className="text-[9px] font-mono text-gray-500 font-bold">ADMIN PANEL</p>
+            <p className="text-[9px] font-mono text-gray-500 font-bold uppercase">
+              {isAdmin ? 'ADMIN PANEL' : 'TRABAJADOR PANEL'}
+            </p>
           </div>
         </div>
 
-        {/* Píldoras de Navegación Escritorio (>= lg) */}
+        {/* Píldoras de Navegación */}
         <nav className="hidden lg:flex items-center gap-1 bg-brand-dark p-1 border border-border-dark rounded-xl text-xs font-semibold">
           <button 
             onClick={() => setActiveTab('members')}
             className={`px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${activeTab === 'members' ? 'bg-panel-dark text-white shadow' : 'text-gray-400 hover:text-white'}`}
+            title="Ver catálogo, dispensario, auditoría y censo"
           >
             <Users size={13} /> Socios ({members.length})
           </button>
+          
           <button 
             onClick={() => setActiveTab('register')}
             className={`px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${activeTab === 'register' ? 'bg-panel-dark text-white shadow' : 'text-gray-400 hover:text-white'}`}
+            title="Dar de alta a un nuevo socio"
           >
             <UserPlus size={13} /> Alta Socio
           </button>
-          <button 
-            onClick={() => setActiveTab('workers')}
-            className={`px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${activeTab === 'workers' ? 'bg-panel-dark text-white shadow' : 'text-gray-400 hover:text-white'}`}
-          >
-            <ShieldAlert size={13} /> Personal & Auditoría
-          </button>
+
+          {canManageWorkers && (
+            <button 
+              onClick={() => setActiveTab('workers')}
+              className={`px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${activeTab === 'workers' ? 'bg-panel-dark text-white shadow' : 'text-gray-400 hover:text-white'}`}
+              title="Administrar personal, branding y auditoría"
+            >
+              <ShieldAlert size={13} /> Personal & Auditoría
+            </button>
+          )}
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* BOTÓN DE PÁNICO CON CIERRE INMEDIATO DE SESIÓN Y BLOQUEO */}
           <PanicButton 
             currentWorker={workerSession} 
-            locationLabel="Panel de Administrador" 
+            locationLabel={isAdmin ? "Panel de Administrador" : "Panel de Trabajador"} 
             onPanicTriggered={handleLogout}
           />
           <div className="text-right">
@@ -681,7 +671,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* MENÚ ACORDEÓN EXCLUSIVO MÓVIL (< lg) */}
+      {/* Menú Móvil (< lg) */}
       <div className="lg:hidden bg-panel-dark border-b border-border-dark px-3 py-2.5">
         <div className="p-1 bg-brand-dark rounded-2xl border border-border-dark">
           <button
@@ -701,7 +691,7 @@ export default function App() {
           </button>
 
           {isMobileMenuOpen && (
-            <div className="pt-2 border-t border-border-dark/60 grid grid-cols-3 gap-1.5 p-1 animate-in slide-in-from-top-2 duration-150">
+            <div className={`pt-2 border-t border-border-dark/60 grid ${canManageWorkers ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5 p-1 animate-in slide-in-from-top-2 duration-150`}>
               <button
                 type="button"
                 onClick={() => { setActiveTab('members'); setIsMobileMenuOpen(false); }}
@@ -728,40 +718,49 @@ export default function App() {
                 <span className="text-[10px] font-bold">Alta Socio</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => { setActiveTab('workers'); setIsMobileMenuOpen(false); }}
-                className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
-                  activeTab === 'workers'
-                    ? 'bg-panel-dark text-white font-bold border border-border-dark shadow-md'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <Shield size={18} className="mb-1 text-amber-400" />
-                <span className="text-[10px] font-bold">Personal & Audit.</span>
-              </button>
+              {canManageWorkers && (
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('workers'); setIsMobileMenuOpen(false); }}
+                  className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center text-center transition-all ${
+                    activeTab === 'workers'
+                      ? 'bg-panel-dark text-white font-bold border border-border-dark shadow-md'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Shield size={18} className="mb-1 text-amber-400" />
+                  <span className="text-[10px] font-bold">Personal & Audit.</span>
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 md:p-6 space-y-6">
+        
+        {/* PESTAÑA: DISPENSARIO, AUDITORÍA CON PESO REAL, GASTOS Y CENSO */}
         {activeTab === 'members' && (
           <div className="space-y-6">
-            <DashboardStats members={members} />
+            
+            <DashboardStats members={members} currentWorker={workerSession} />
 
-            {/* SECCIÓN DE CONTABILIDAD Y GASTOS OPERATIVOS */}
-            <ExpensesManager />
+            {/* CONTROL DE GASTOS: EXCLUSIVO ADMIN */}
+            {isAdmin && <ExpensesManager currentWorker={workerSession} />}
 
+            {/* Directorio de Miembros */}
             <div className="bg-panel-dark border border-border-dark rounded-3xl p-4 sm:p-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h2 className="text-base sm:text-xl font-bold text-white uppercase">Directorio de Miembros ({members.length})</h2>
-                <button 
-                  onClick={() => setActiveTab('register')}
-                  className="px-4 py-2 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-1.5 shadow"
-                >
-                  <UserPlus size={14} /> Registrar Socio
-                </button>
+                {(isAdmin || workerSession.permissions?.includes('register_users')) && (
+                  <button 
+                    onClick={() => setActiveTab('register')}
+                    className="px-4 py-2 bg-brand-red hover:bg-brand-red-hover text-white rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-1.5 shadow"
+                    title="Dar de alta socio presencial"
+                  >
+                    <UserPlus size={14} /> Registrar Socio
+                  </button>
+                )}
               </div>
 
               <div className="relative">
@@ -771,6 +770,7 @@ export default function App() {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="w-full h-10 bg-brand-dark text-gray-200 border border-border-dark rounded-xl pl-9 pr-4 text-xs font-semibold focus:outline-none focus:border-brand-red"
+                  title="Escribe nombre o documento para filtrar en tiempo real"
                 />
               </div>
 
@@ -789,15 +789,19 @@ export default function App() {
                       <button 
                         onClick={() => setSelectedMember(member)}
                         className="px-2.5 py-1.5 bg-gray-900 border border-border-dark text-xs font-bold text-gray-300 rounded-lg hover:text-white"
+                        title="Ver ficha, documentos y carnet del socio"
                       >
                         Ficha
                       </button>
-                      <button 
-                        onClick={() => handleDeleteMember(member.id)}
-                        className="p-1.5 bg-gray-900 hover:bg-rose-500/10 text-gray-400 hover:text-rose-400 rounded-lg border border-border-dark"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {(isAdmin || workerSession.permissions?.includes('delete_records')) && (
+                        <button 
+                          onClick={() => handleDeleteMember(member.id)}
+                          className="p-1.5 bg-gray-900 hover:bg-rose-500/10 text-gray-400 hover:text-rose-400 rounded-lg border border-border-dark"
+                          title="Dar de baja socio permanentemente"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -806,10 +810,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ALTA SOCIO ADMIN (1 SOLA FOTO) */}
+        {/* PESTAÑA: ALTA SOCIO CON FOTO */}
         {activeTab === 'register' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-            
             <div className="lg:col-span-5 space-y-4">
               <DniPhotoCapture
                 frontImage={formDniFront}
@@ -851,6 +854,7 @@ export default function App() {
                           doc.save(`Alta_Socio_${lastRegisteredMember.dniPassport}_${appName}.pdf`);
                         }}
                         className="w-full py-2.5 bg-brand-red hover:bg-brand-red-hover text-white font-bold text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all"
+                        title="Imprimir contrato oficial firmado"
                       >
                         <Download size={14} /> Imprimir Ficha de Alta PDF
                       </button>
@@ -997,6 +1001,7 @@ export default function App() {
                     type="submit"
                     disabled={isSubmitting}
                     className="w-full h-12 bg-brand-red hover:bg-brand-red-hover text-white font-bold text-xs uppercase rounded-xl shadow-lg transition-all"
+                    title="Confirmar datos y guardar socio"
                   >
                     {isSubmitting ? 'Registrando Socio...' : 'Confirmar y Registrar Socio'}
                   </button>
@@ -1006,8 +1011,8 @@ export default function App() {
           </div>
         )}
 
-        {/* GESTIÓN DE PERSONAL */}
-        {activeTab === 'workers' && (
+        {/* PESTAÑA: PERSONAL Y AUDITORÍA */}
+        {activeTab === 'workers' && canManageWorkers && (
           <WorkersPanel 
             adminWorker={workerSession}
             workers={workers}
@@ -1022,6 +1027,7 @@ export default function App() {
         )}
       </main>
 
+      {/* Pop-up modal de Ficha de Socio */}
       {selectedMember && (
         <SocioTemplate 
           member={selectedMember}
@@ -1032,7 +1038,7 @@ export default function App() {
         />
       )}
 
-      {/* Alarma de pánico para administradores */}
+      {/* Alarma de pánico silenciosa */}
       <PanicAlarmModal 
         alerts={panicAlerts} 
         currentAdmin={workerSession} 
