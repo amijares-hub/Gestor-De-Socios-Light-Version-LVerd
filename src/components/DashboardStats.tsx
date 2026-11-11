@@ -17,7 +17,8 @@ import {
   RefreshCw, 
   Coins, 
   Lock, 
-  ArrowRightLeft 
+  ArrowRightLeft,
+  AlertTriangle
 } from 'lucide-react';
 import { AssociationMember, CannabisProduct, DispensationLog, WorkerUser } from '../types';
 import { supabase } from '../supabaseClient';
@@ -244,6 +245,14 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
     setPesoReal(calculatedGrams);
   };
 
+  // Cálculo de Límites de Cortesía / Peso Real
+  const currentGramsNum = parseDecimalInput(dispenseGrams);
+  const currentPesoRealNum = parseDecimalInput(pesoReal);
+  const maxAllowedExtra = currentGramsNum < 5 ? 0.09 : 1.0;
+  const maxAllowedRealWeight = Number((currentGramsNum + maxAllowedExtra).toFixed(2));
+  const currentExtra = Number((currentPesoRealNum - currentGramsNum).toFixed(2));
+  const isExtraExceeded = currentExtra > maxAllowedExtra + 0.0001;
+
   const handleConfirmDispense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProductToDispense) return;
@@ -254,6 +263,14 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
 
     if (gramsNum <= 0 && eurosNum <= 0) {
       alert("Introduce una cantidad válida en gramos o euros.");
+      return;
+    }
+
+    // Validación estricta del límite de peso extra
+    const extraLimit = gramsNum < 5 ? 0.09 : 1.0;
+    const maxRealWeight = Number((gramsNum + extraLimit).toFixed(2));
+    if (pesoRealNum > maxRealWeight + 0.0001) {
+      alert(`⚠️ Límite de cortesía superado:\nPara ${gramsNum}g, el extra máximo permitido es de +${extraLimit}g.\nEl peso real no puede superar ${maxRealWeight}g.`);
       return;
     }
 
@@ -310,6 +327,14 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
     const newGrams = parseDecimalInput(editDispenseGrams);
     const newRealWeight = parseDecimalInput(editRealWeight) || newGrams;
     if (newGrams <= 0) return;
+
+    // Validación estricta del límite en la edición
+    const editExtraLimit = newGrams < 5 ? 0.09 : 1.0;
+    const maxRealWeight = Number((newGrams + editExtraLimit).toFixed(2));
+    if (newRealWeight > maxRealWeight + 0.0001) {
+      alert(`⚠️ Límite de cortesía superado:\nPara ${newGrams}g, el extra máximo permitido es de +${editExtraLimit}g.\nEl peso real no puede superar ${maxRealWeight}g.`);
+      return;
+    }
 
     const oldRealWeight = editingDispense.realWeight || editingDispense.grams;
     const diffGrams = newRealWeight - oldRealWeight;
@@ -615,7 +640,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
                   {canDispense && (
                     <button
                       onClick={() => handleOpenDispense(prod)}
-                      className="w-full h-8 bg-emerald-600/15 hover:bg-emerald-600 border border-emerald-500/30 hover:border-emerald-600 text-emerald-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                      className="w-full h-8 bg-emerald-600/15 hover:bg-emerald-600 border border-emerald-500/30 hover:border-emerald-500 text-emerald-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
                       title="Registrar cierre o dispensación de esta variedad"
                     >
                       <Scale size={13} /> Dispensar Jornada
@@ -918,7 +943,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
         </div>
       )}
 
-      {/* 5. MODAL DISPENSAR JORNADA CON EUROS Y PESO REAL */}
+      {/* 5. MODAL DISPENSAR JORNADA CON LIMITACIÓN DE CORTESÍA / PESO REAL */}
       {isDispenseModalOpen && selectedProductToDispense && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-6 sm:p-7 max-w-md w-full relative space-y-4 shadow-2xl overflow-hidden">
@@ -1030,7 +1055,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
                 </div>
               </div>
 
-              {/* 3. Peso Real (Báscula) */}
+              {/* 3. Peso Real (Báscula) con Límite de Cortesía */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[10px] font-mono text-amber-400 uppercase font-bold flex items-center gap-1">
@@ -1038,7 +1063,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
                     Peso Real (Báscula / Entrega Física) *
                   </label>
                   <span className="text-[9px] font-mono text-gray-400" title="Gramos físicos que salen del tarro">
-                    Gramos reales que salen
+                    Máx: {maxAllowedRealWeight.toFixed(2)} g (+{maxAllowedExtra.toFixed(2)}g)
                   </span>
                 </div>
                 <div className="relative">
@@ -1049,16 +1074,34 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
                     placeholder="0.00"
                     value={pesoReal}
                     onChange={e => setPesoReal(e.target.value)}
-                    className="w-full h-10 px-3.5 pr-8 bg-[#080d0a] border border-amber-500/30 focus:border-amber-400 rounded-xl text-amber-300 font-mono font-bold text-sm focus:outline-none"
-                    title="Gramos físicos que se restan del stock del club"
+                    className={`w-full h-10 px-3.5 pr-8 bg-[#080d0a] border rounded-xl font-mono font-bold text-sm focus:outline-none transition-colors ${
+                      isExtraExceeded 
+                        ? 'border-rose-500 text-rose-400' 
+                        : 'border-amber-500/30 focus:border-amber-400 text-amber-300'
+                    }`}
+                    title="Gramos físicos reales que se restan del stock del club"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-amber-500">
                     g
                   </span>
                 </div>
-                <p className="text-[9px] font-mono text-gray-500 mt-1">
-                  * Si diste más gramos por cortesía, indica el peso físico real. Se descontará este valor exacto del inventario.
-                </p>
+
+                {isExtraExceeded ? (
+                  <div className="mt-1.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-start gap-1.5 text-rose-400 text-[10px] font-mono">
+                    <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                    <span>
+                      Límite superado: Para {currentGramsNum}g, el extra máximo permitido es de +{maxAllowedExtra.toFixed(2)}g (Peso real máx: {maxAllowedRealWeight.toFixed(2)}g).
+                    </span>
+                  </div>
+                ) : currentExtra > 0 ? (
+                  <p className="text-[9px] font-mono text-emerald-400 mt-1 flex items-center gap-1">
+                    <Check size={11} /> Cortesía aplicada: +{currentExtra.toFixed(2)}g (Permitido hasta +{maxAllowedExtra.toFixed(2)}g).
+                  </p>
+                ) : (
+                  <p className="text-[9px] font-mono text-gray-500 mt-1">
+                    * Límite de cortesía: +0.09g para menos de 5g | +1.00g para 5g o más.
+                  </p>
+                )}
               </div>
 
               {/* Resumen */}
@@ -1071,7 +1114,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
                 </div>
                 <div className="flex justify-between items-center text-[11px] pt-1 border-t border-[#1a2a1e]">
                   <span className="text-gray-500">Descuento de Stock (Peso Real):</span>
-                  <span className="font-bold text-rose-400" title="Disminución de stock real">
+                  <span className={`font-bold ${isExtraExceeded ? 'text-rose-500' : 'text-rose-400'}`} title="Disminución de stock real">
                     -{(parseDecimalInput(pesoReal) || parseDecimalInput(dispenseGrams) || 0).toFixed(2)} g
                   </span>
                 </div>
@@ -1085,8 +1128,13 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
 
               <button
                 type="submit"
-                className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-98"
-                title="Confirmar el cierre y descontar inventario"
+                disabled={isExtraExceeded}
+                className={`w-full h-11 font-bold uppercase rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-98 ${
+                  isExtraExceeded 
+                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-[#1a2a1e]' 
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}
+                title={isExtraExceeded ? "Ajusta el peso real dentro del margen permitido" : "Confirmar el cierre y descontar inventario"}
               >
                 <Check size={16} />
                 <span>Confirmar Cierre de Jornada</span>
