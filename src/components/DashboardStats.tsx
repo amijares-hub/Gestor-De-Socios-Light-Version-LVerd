@@ -18,7 +18,8 @@ import {
   Coins, 
   Lock, 
   ArrowRightLeft,
-  AlertTriangle
+  AlertTriangle,
+  Filter
 } from 'lucide-react';
 import { AssociationMember, CannabisProduct, DispensationLog, WorkerUser } from '../types';
 import { supabase } from '../supabaseClient';
@@ -68,6 +69,9 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
   const [dispensations, setDispensations] = useState<DispensationLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [periodFilter, setPeriodFilter] = useState<'day' | 'week' | 'month'>('day');
+
+  // FILTRO POR VARIEDAD/PRODUCTO (Selección de uno o varios a la vez)
+  const [selectedProductFilters, setSelectedProductFilters] = useState<string[]>([]);
 
   // Modales Producto
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -124,7 +128,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
         .from('dispensations')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(200);
+        .limit(300);
 
       if (!dispErr && dispData) {
         setDispensations(dispData.map((d: any) => ({
@@ -266,7 +270,6 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
       return;
     }
 
-    // Validación estricta del límite de peso extra
     const extraLimit = gramsNum < 5 ? 0.09 : 1.0;
     const maxRealWeight = Number((gramsNum + extraLimit).toFixed(2));
     if (pesoRealNum > maxRealWeight + 0.0001) {
@@ -328,7 +331,6 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
     const newRealWeight = parseDecimalInput(editRealWeight) || newGrams;
     if (newGrams <= 0) return;
 
-    // Validación estricta del límite en la edición
     const editExtraLimit = newGrams < 5 ? 0.09 : 1.0;
     const maxRealWeight = Number((newGrams + editExtraLimit).toFixed(2));
     if (newRealWeight > maxRealWeight + 0.0001) {
@@ -411,6 +413,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
     }
   };
 
+  // --- FILTROS DE TIEMPO Y PRODUCTOS ---
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
@@ -419,7 +422,8 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
   const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distanceToMonday).getTime();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
-  const filteredDispensations = dispensations.filter(d => {
+  // 1. Filtrar por fecha
+  const periodFilteredDispensations = dispensations.filter(d => {
     const time = new Date(d.createdAt).getTime();
     if (periodFilter === 'day') return time >= startOfDay;
     if (periodFilter === 'week') return time >= startOfWeek;
@@ -427,13 +431,26 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
     return true;
   });
 
+  // Lista tipada explícitamente como string[] para evitar el error ts(2345)
+  const availableProductNames: string[] = Array.from(
+    new Set<string>(periodFilteredDispensations.map(d => d.productName))
+  ).sort();
+
+  // 2. Filtrar por productos seleccionados
+  const filteredDispensations = periodFilteredDispensations.filter(d => {
+    if (selectedProductFilters.length === 0) return true;
+    return selectedProductFilters.includes(d.productName);
+  });
+
+  // Totales basados en el filtro aplicado
   const totalGramsSold = filteredDispensations.reduce((acc, curr) => acc + curr.grams, 0);
   const totalRealWeightDispensed = filteredDispensations.reduce((acc, curr) => acc + (curr.realWeight || curr.grams), 0);
   const totalAmountSold = filteredDispensations.reduce((acc, curr) => acc + curr.totalPrice, 0);
   const totalOperations = filteredDispensations.length;
 
+  // Desglose del Ranking en el periodo
   const productBreakdown: Record<string, { grams: number; realWeight: number; total: number; count: number }> = {};
-  filteredDispensations.forEach(d => {
+  periodFilteredDispensations.forEach(d => {
     if (!productBreakdown[d.productName]) {
       productBreakdown[d.productName] = { grams: 0, realWeight: 0, total: 0, count: 0 };
     }
@@ -444,6 +461,18 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
   });
 
   const sortedProductStats = Object.entries(productBreakdown).sort((a, b) => b[1].grams - a[1].grams);
+
+  const toggleProductFilter = (prodName: string) => {
+    setSelectedProductFilters(prev => 
+      prev.includes(prodName) 
+        ? prev.filter(p => p !== prodName) 
+        : [...prev, prodName]
+    );
+  };
+
+  const clearProductFilters = () => {
+    setSelectedProductFilters([]);
+  };
 
   return (
     <div className="space-y-6">
@@ -704,9 +733,76 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
           </div>
         </div>
 
-        {/* Resumen del Periodo: Tarjetas KPI con Gramos Cobrados y Peso Real */}
+        {/* BARRA DE FILTRO POR VARIEDAD / PRODUCTO */}
+        <div className="bg-[#080d0a] border border-[#1a2a1e] rounded-2xl p-3.5 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Filter size={14} className="text-emerald-400" />
+              <span className="text-[11px] font-mono font-bold text-gray-300 uppercase tracking-wider">
+                Filtro por Variedad:
+              </span>
+              {selectedProductFilters.length > 0 ? (
+                <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25">
+                  {selectedProductFilters.length} {selectedProductFilters.length === 1 ? 'seleccionada' : 'seleccionadas'}
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono text-gray-500">
+                  Mostrando todas las variedades
+                </span>
+              )}
+            </div>
+
+            {selectedProductFilters.length > 0 && (
+              <button
+                type="button"
+                onClick={clearProductFilters}
+                className="h-6 px-2.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 rounded-lg text-[10px] font-mono font-bold uppercase transition-all flex items-center gap-1"
+                title="Quitar filtro de variedades y ver todo"
+              >
+                <X size={11} /> Limpiar Filtro
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <button
+              type="button"
+              onClick={clearProductFilters}
+              className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold uppercase border transition-all ${
+                selectedProductFilters.length === 0
+                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
+                  : 'bg-[#0e1711] border-[#1a2a1e] text-gray-400 hover:text-white hover:border-gray-700'
+              }`}
+              title="Mostrar todas las variedades sin filtrar"
+            >
+              [TODAS]
+            </button>
+
+            {availableProductNames.map((prodName: string) => {
+              const isSelected = selectedProductFilters.includes(prodName);
+              return (
+                <button
+                  key={prodName}
+                  type="button"
+                  onClick={() => toggleProductFilter(prodName)}
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold uppercase border transition-all flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500 shadow-sm ring-1 ring-emerald-500/40'
+                      : 'bg-[#0e1711] border-[#1a2a1e] text-gray-400 hover:text-gray-200 hover:border-emerald-500/40'
+                  }`}
+                  title={`Clic para ${isSelected ? 'deseleccionar' : 'seleccionar'} ${prodName}`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'}`}></span>
+                  <span>{prodName}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Resumen del Periodo */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 bg-[#080d0a] border border-[#1a2a1e] rounded-2xl flex items-center justify-between" title="Cantidad teórica de gramos facturada en función de las aportaciones">
+          <div className="p-4 bg-[#080d0a] border border-[#1a2a1e] rounded-2xl flex items-center justify-between" title="Cantidad teórica de gramos facturada en función de las aportaciones (filtrada)">
             <div>
               <span className="text-[10px] font-mono text-gray-500 uppercase font-bold">TOTAL DISPENSADO</span>
               <p className="text-2xl font-black text-white mt-1">{totalGramsSold.toFixed(2)} <span className="text-sm font-normal text-gray-400">g</span></p>
@@ -714,7 +810,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
             <Scale size={24} className="text-emerald-400" />
           </div>
 
-          <div className="p-4 bg-[#080d0a] border border-amber-500/30 rounded-2xl flex items-center justify-between" title="Peso físico real total que salió de la báscula y se descontó del inventario">
+          <div className="p-4 bg-[#080d0a] border border-amber-500/30 rounded-2xl flex items-center justify-between" title="Peso físico real total que salió de la báscula y se descontó del inventario (filtrado)">
             <div>
               <span className="text-[10px] font-mono text-amber-400 uppercase font-bold">TOTAL PESO REAL</span>
               <p className="text-2xl font-black text-amber-300 mt-1">{totalRealWeightDispensed.toFixed(2)} <span className="text-sm font-normal text-amber-500/70">g</span></p>
@@ -722,7 +818,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
             <Scale size={24} className="text-amber-400" />
           </div>
 
-          <div className="p-4 bg-[#080d0a] border border-[#1a2a1e] rounded-2xl flex items-center justify-between" title="Aportaciones económicas totales acumuladas en este periodo">
+          <div className="p-4 bg-[#080d0a] border border-[#1a2a1e] rounded-2xl flex items-center justify-between" title="Aportaciones económicas totales acumuladas en este periodo (filtrada)">
             <div>
               <span className="text-[10px] font-mono text-gray-500 uppercase font-bold">APORTACIONES TOTALES</span>
               <p className="text-2xl font-black text-emerald-400 mt-1">{totalAmountSold.toFixed(2)} <span className="text-sm font-normal text-emerald-500/70">€</span></p>
@@ -730,7 +826,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
             <Coins size={24} className="text-emerald-400" />
           </div>
 
-          <div className="p-4 bg-[#080d0a] border border-[#1a2a1e] rounded-2xl flex items-center justify-between" title="Cantidad de cierres de jornada o dispensaciones registradas">
+          <div className="p-4 bg-[#080d0a] border border-[#1a2a1e] rounded-2xl flex items-center justify-between" title="Cantidad de cierres de jornada o dispensaciones registradas (filtrada)">
             <div>
               <span className="text-[10px] font-mono text-gray-500 uppercase font-bold">CIERRES REGISTRADOS</span>
               <p className="text-2xl font-black text-white mt-1">{totalOperations}</p>
@@ -741,39 +837,72 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
 
         {/* Desglose por Variedad en el Periodo */}
         <div className="space-y-3">
-          <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider font-mono" title="Ranking ordenado por cantidad total dispensada">
-            Ranking de Variedades ({periodFilter === 'day' ? 'Hoy' : periodFilter === 'week' ? 'Semana' : 'Mes'})
-          </h4>
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider font-mono" title="Haz clic en cualquier variedad para seleccionarla o deseleccionarla">
+              Ranking de Variedades ({periodFilter === 'day' ? 'Hoy' : periodFilter === 'week' ? 'Semana' : 'Mes'})
+            </h4>
+            <span className="text-[10px] font-mono text-gray-500 hidden sm:inline-block">
+              * Haz clic en una variedad para seleccionarla o filtrar
+            </span>
+          </div>
 
           {sortedProductStats.length === 0 ? (
             <p className="text-xs text-gray-500 italic">No hay dispensaciones en este periodo temporal.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {sortedProductStats.map(([prodName, stats]) => (
-                <div key={prodName} className="p-3 bg-[#080d0a] border border-[#1a2a1e] rounded-xl text-xs space-y-1.5" title={`Detalles acumulados de ${prodName}`}>
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-white truncate">{prodName}</span>
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold" title="Gramos cobrados">{stats.grams.toFixed(2)} g</span>
+              {sortedProductStats.map(([prodName, stats]) => {
+                const isSelected = selectedProductFilters.includes(prodName);
+                const hasFiltersActive = selectedProductFilters.length > 0;
+
+                return (
+                  <div 
+                    key={prodName} 
+                    onClick={() => toggleProductFilter(prodName)}
+                    className={`p-3 rounded-xl text-xs space-y-1.5 cursor-pointer transition-all border select-none ${
+                      isSelected
+                        ? 'bg-[#101b13] border-emerald-500 shadow-md ring-1 ring-emerald-500/40'
+                        : hasFiltersActive
+                          ? 'bg-[#080d0a]/50 border-[#1a2a1e] opacity-45 hover:opacity-100 hover:border-gray-700'
+                          : 'bg-[#080d0a] border-[#1a2a1e] hover:border-emerald-500/40'
+                    }`}
+                    title={`Haz clic para ${isSelected ? 'deseleccionar' : 'filtrar por'} ${prodName}`}
+                  >
+                    <div className="flex justify-between items-center gap-1">
+                      <span className={`font-bold truncate ${isSelected ? 'text-emerald-300' : 'text-white'}`}>
+                        {prodName}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isSelected && <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/20 px-1 rounded">✓</span>}
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold" title="Gramos cobrados">{stats.grams.toFixed(2)} g</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] text-gray-400 font-mono">
+                      <span className="text-amber-400" title="Peso físico real entregado">Real: {stats.realWeight.toFixed(2)} g</span>
+                      <span title="Aporte económico total">{stats.total.toFixed(2)} €</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center text-[10px] text-gray-400 font-mono">
-                    <span className="text-amber-400" title="Peso físico real entregado">Real: {stats.realWeight.toFixed(2)} g</span>
-                    <span title="Aporte económico total">{stats.total.toFixed(2)} €</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
         {/* Bitácora de Cierres de Jornada con Peso Real */}
         <div className="space-y-3 pt-2">
-          <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider font-mono">
-            Bitácora de Cierres de Jornada
-          </h4>
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider font-mono">
+              Bitácora de Cierres de Jornada
+            </h4>
+            {selectedProductFilters.length > 0 && (
+              <span className="text-[10px] font-mono text-emerald-400">
+                Filtrando {filteredDispensations.length} {filteredDispensations.length === 1 ? 'registro' : 'registros'}
+              </span>
+            )}
+          </div>
 
           <div className="overflow-x-auto border border-[#1a2a1e] rounded-2xl bg-[#080d0a]">
             {filteredDispensations.length === 0 ? (
-              <p className="text-xs text-gray-500 text-center py-8">Sin registros en el periodo seleccionado.</p>
+              <p className="text-xs text-gray-500 text-center py-8">Sin registros en el periodo o filtro seleccionado.</p>
             ) : (
               <table className="w-full text-left border-collapse text-xs min-w-[760px]">
                 <thead>
