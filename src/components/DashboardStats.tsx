@@ -19,7 +19,10 @@ import {
   Lock, 
   ArrowRightLeft,
   AlertTriangle,
-  Filter
+  Filter,
+  CheckSquare,
+  Square,
+  Layers
 } from 'lucide-react';
 import { AssociationMember, CannabisProduct, DispensationLog, WorkerUser } from '../types';
 import { supabase } from '../supabaseClient';
@@ -28,6 +31,13 @@ import StickyNotesWidget from './StickyNotesWidget';
 interface DashboardStatsProps {
   members: AssociationMember[];
   currentWorker?: WorkerUser | null;
+}
+
+interface BatchDispenseItem {
+  product: CannabisProduct;
+  grams: string;
+  euros: string;
+  pesoReal: string;
 }
 
 export default function DashboardStats({ members, currentWorker }: DashboardStatsProps) {
@@ -70,10 +80,17 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [periodFilter, setPeriodFilter] = useState<'day' | 'week' | 'month'>('day');
 
-  // FILTRO POR VARIEDAD/PRODUCTO (Selección de uno o varios a la vez)
+  // FILTRO POR VARIEDAD EN AUDITORÍA
   const [selectedProductFilters, setSelectedProductFilters] = useState<string[]>([]);
 
-  // Modales Producto
+  // SELECCIÓN MÚLTIPLE PARA DISPENSACIÓN EN LOTE (BATCH)
+  const [selectedBatchProductIds, setSelectedBatchProductIds] = useState<string[]>([]);
+  const [isBatchDispenseModalOpen, setIsBatchDispenseModalOpen] = useState(false);
+  const [batchDispenseDate, setBatchDispenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [batchItems, setBatchItems] = useState<BatchDispenseItem[]>([]);
+  const [isSubmittingBatch, setIsSubmittingBatch] = useState(false);
+
+  // Modales Producto individual
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<CannabisProduct | null>(null);
   const [formName, setFormName] = useState('');
@@ -82,7 +99,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
   const [formPrice, setFormPrice] = useState('8.00');
   const [formStock, setFormStock] = useState('100');
 
-  // Modal Dispensación con Euros Producidos y Peso Real
+  // Modal Dispensación Individual
   const [isDispenseModalOpen, setIsDispenseModalOpen] = useState(false);
   const [selectedProductToDispense, setSelectedProductToDispense] = useState<CannabisProduct | null>(null);
   const [dispenseDate, setDispenseDate] = useState(new Date().toISOString().split('T')[0]);
@@ -156,6 +173,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
     fetchDispensaryData();
   }, []);
 
+  // CRUD Productos
   const handleOpenCreateProduct = () => {
     setEditingProduct(null);
     setFormName('');
@@ -215,11 +233,162 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
       const { error } = await supabase.from('cannabis_products').delete().eq('id', id);
       if (error) throw error;
       setProducts(prev => prev.filter(p => p.id !== id));
+      setSelectedBatchProductIds(prev => prev.filter(pId => pId !== id));
     } catch (err: any) {
       alert("Error eliminando producto: " + err.message);
     }
   };
 
+  // --- SELECCIÓN MÚLTIPLE DE VARIEDADES PARA DISPENSAR EN LOTE ---
+  const toggleSelectBatchProduct = (productId: string) => {
+    setSelectedBatchProductIds(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId) 
+        : [...prev, productId]
+    );
+  };
+
+  const selectAllBatchProducts = () => {
+    if (selectedBatchProductIds.length === products.length) {
+      setSelectedBatchProductIds([]);
+    } else {
+      setSelectedBatchProductIds(products.map(p => p.id));
+    }
+  };
+
+  const handleOpenBatchModal = () => {
+    const selectedProds = products.filter(p => selectedBatchProductIds.includes(p.id));
+    if (selectedProds.length === 0) return;
+
+    const initialItems: BatchDispenseItem[] = selectedProds.map(prod => {
+      const initG = 5.0;
+      const initEur = (initG * prod.pricePerGram).toFixed(2);
+      return {
+        product: prod,
+        grams: initG.toString(),
+        euros: initEur,
+        pesoReal: initG.toString()
+      };
+    });
+
+    setBatchItems(initialItems);
+    setBatchDispenseDate(new Date().toISOString().split('T')[0]);
+    setIsBatchDispenseModalOpen(true);
+  };
+
+  const handleBatchItemGramsChange = (index: number, val: string) => {
+    setBatchItems(prev => {
+      const updated = [...prev];
+      const item = { ...updated[index] };
+      item.grams = val;
+      const g = parseDecimalInput(val);
+      item.euros = (g * item.product.pricePerGram).toFixed(2);
+      item.pesoReal = val;
+      updated[index] = item;
+      return updated;
+    });
+  };
+
+  const handleBatchItemEurosChange = (index: number, val: string) => {
+    setBatchItems(prev => {
+      const updated = [...prev];
+      const item = { ...updated[index] };
+      item.euros = val;
+      const eur = parseDecimalInput(val);
+      if (item.product.pricePerGram > 0) {
+        const calculatedGrams = (eur / item.product.pricePerGram).toFixed(2);
+        item.grams = calculatedGrams;
+        item.pesoReal = calculatedGrams;
+      }
+      updated[index] = item;
+      return updated;
+    });
+  };
+
+  const handleBatchItemRealWeightChange = (index: number, val: string) => {
+    setBatchItems(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], pesoReal: val };
+      return updated;
+    });
+  };
+
+  const handleRemoveBatchItem = (index: number) => {
+    const itemToRemove = batchItems[index];
+    setBatchItems(prev => prev.filter((_, i) => i !== index));
+    if (itemToRemove) {
+      setSelectedBatchProductIds(prev => prev.filter(id => id !== itemToRemove.product.id));
+    }
+  };
+
+  // Validación de límites en lote
+  const checkBatchErrors = () => {
+    for (const item of batchItems) {
+      const g = parseDecimalInput(item.grams);
+      const pr = parseDecimalInput(item.pesoReal);
+      const maxExtra = g < 5 ? 0.09 : 1.0;
+      const extra = pr - g;
+      if (g <= 0) return true;
+      if (extra > maxExtra + 0.0001) return true;
+    }
+    return false;
+  };
+
+  const hasBatchErrors = checkBatchErrors();
+
+  const handleConfirmBatchDispense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (batchItems.length === 0 || hasBatchErrors || isSubmittingBatch) return;
+
+    setIsSubmittingBatch(true);
+    const nowTimeStr = new Date().toTimeString().split(' ')[0];
+    const timestamp = new Date(`${batchDispenseDate}T${nowTimeStr}`).toISOString();
+    const workerName = currentWorker?.name || 'Administrador / Trabajador';
+
+    try {
+      for (const item of batchItems) {
+        const gramsNum = parseDecimalInput(item.grams);
+        const eurosNum = parseDecimalInput(item.euros);
+        const pesoRealNum = parseDecimalInput(item.pesoReal) || gramsNum;
+
+        // 1. Guardar registro en dispensaciones
+        const { error: dispErr } = await supabase.from('dispensations').insert([{
+          product_id: item.product.id,
+          product_name: item.product.name,
+          member_id: null,
+          member_number: 'JORNADA',
+          member_name: `Cierre Múltiple (${batchDispenseDate}) • Real: ${pesoRealNum.toFixed(2)}g`,
+          grams: gramsNum,
+          real_weight: pesoRealNum,
+          total_price: eurosNum,
+          dispensed_by: workerName,
+          created_at: timestamp
+        }]);
+
+        if (dispErr) throw dispErr;
+
+        // 2. Descontar el Peso Real de inventario
+        const currentStock = Number(item.product.stockGrams) || 0;
+        const newStock = Math.max(0, currentStock - pesoRealNum);
+
+        await supabase
+          .from('cannabis_products')
+          .update({ stock_grams: newStock })
+          .eq('id', item.product.id);
+      }
+
+      setIsBatchDispenseModalOpen(false);
+      setSelectedBatchProductIds([]);
+      setBatchItems([]);
+      fetchDispensaryData();
+    } catch (err: any) {
+      alert("Error en dispensación múltiple: " + err.message);
+    } finally {
+      setIsSubmittingBatch(false);
+    }
+  };
+
+  // --- DISPENSACIÓN INDIVIDUAL ---
   const handleOpenDispense = (prod: CannabisProduct) => {
     setSelectedProductToDispense(prod);
     setDispenseDate(new Date().toISOString().split('T')[0]);
@@ -249,7 +418,6 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
     setPesoReal(calculatedGrams);
   };
 
-  // Cálculo de Límites de Cortesía / Peso Real
   const currentGramsNum = parseDecimalInput(dispenseGrams);
   const currentPesoRealNum = parseDecimalInput(pesoReal);
   const maxAllowedExtra = currentGramsNum < 5 ? 0.09 : 1.0;
@@ -422,7 +590,6 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
   const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distanceToMonday).getTime();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
-  // 1. Filtrar por fecha
   const periodFilteredDispensations = dispensations.filter(d => {
     const time = new Date(d.createdAt).getTime();
     if (periodFilter === 'day') return time >= startOfDay;
@@ -431,24 +598,20 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
     return true;
   });
 
-  // Lista tipada explícitamente como string[] para evitar el error ts(2345)
   const availableProductNames: string[] = Array.from(
     new Set<string>(periodFilteredDispensations.map(d => d.productName))
   ).sort();
 
-  // 2. Filtrar por productos seleccionados
   const filteredDispensations = periodFilteredDispensations.filter(d => {
     if (selectedProductFilters.length === 0) return true;
     return selectedProductFilters.includes(d.productName);
   });
 
-  // Totales basados en el filtro aplicado
   const totalGramsSold = filteredDispensations.reduce((acc, curr) => acc + curr.grams, 0);
   const totalRealWeightDispensed = filteredDispensations.reduce((acc, curr) => acc + (curr.realWeight || curr.grams), 0);
   const totalAmountSold = filteredDispensations.reduce((acc, curr) => acc + curr.totalPrice, 0);
   const totalOperations = filteredDispensations.length;
 
-  // Desglose del Ranking en el periodo
   const productBreakdown: Record<string, { grams: number; realWeight: number; total: number; count: number }> = {};
   periodFilteredDispensations.forEach(d => {
     if (!productBreakdown[d.productName]) {
@@ -473,6 +636,12 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
   const clearProductFilters = () => {
     setSelectedProductFilters([]);
   };
+
+  // Totales acumulados para el modal de Dispensación Múltiple
+  const batchTotalGrams = batchItems.reduce((acc, item) => acc + parseDecimalInput(item.grams), 0);
+  const batchTotalEuros = batchItems.reduce((acc, item) => acc + parseDecimalInput(item.euros), 0);
+  const batchTotalPesoReal = batchItems.reduce((acc, item) => acc + (parseDecimalInput(item.pesoReal) || parseDecimalInput(item.grams)), 0);
+  const batchTotalCourtesy = batchTotalPesoReal - batchTotalGrams;
 
   return (
     <div className="space-y-6">
@@ -567,20 +736,53 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
         </div>
       </div>
 
-      {/* 2. CATÁLOGO DE VARIEDADES & DISPENSACIÓN DIARIA */}
+      {/* 2. CATÁLOGO DE VARIEDADES & DISPENSACIÓN DIARIA (CON MULTI-SELECCIÓN) */}
       <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-5 md:p-7 shadow-2xl space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1a2a1e] pb-4">
           <div>
-            <h3 className="text-base sm:text-lg font-display font-black text-white uppercase flex items-center gap-2">
-              <ShoppingBag size={20} className="text-emerald-400" />
-              Variedades Disponibles & Control Diario
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-display font-black text-white uppercase flex items-center gap-2">
+                <ShoppingBag size={20} className="text-emerald-400" />
+                Variedades Disponibles & Control Diario
+              </h3>
+              {selectedBatchProductIds.length > 0 && (
+                <span className="text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full animate-pulse">
+                  {selectedBatchProductIds.length} seleccionadas
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-400 mt-0.5">
-              Control de stock por gramo y registro de dispensación al final de la jornada
+              Selecciona una o varias variedades para dispensar conjuntamente con pesajes independientes
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Botón para seleccionar / deseleccionar todas */}
+            {canDispense && products.length > 0 && (
+              <button
+                type="button"
+                onClick={selectAllBatchProducts}
+                className="h-10 px-3 bg-[#080d0a] hover:bg-[#1a2a1e] border border-[#1a2a1e] text-gray-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
+                title={selectedBatchProductIds.length === products.length ? "Deseleccionar todas" : "Seleccionar todas las variedades del catálogo"}
+              >
+                {selectedBatchProductIds.length === products.length ? <CheckSquare size={14} className="text-emerald-400" /> : <Square size={14} />}
+                <span className="hidden sm:inline">{selectedBatchProductIds.length === products.length ? 'Deseleccionar' : 'Seleccionar Todas'}</span>
+              </button>
+            )}
+
+            {/* BOTÓN PROMINENTE DISPENSAR SELECCIONADAS */}
+            {canDispense && selectedBatchProductIds.length > 0 && (
+              <button
+                type="button"
+                onClick={handleOpenBatchModal}
+                className="h-10 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-2 shadow-xl shadow-emerald-950/60 transition-all animate-bounce"
+                title="Abrir ventana para dispensar las variedades seleccionadas a la vez"
+              >
+                <Layers size={16} />
+                <span>Dispensar Selección ({selectedBatchProductIds.length})</span>
+              </button>
+            )}
+
             <button
               onClick={fetchDispensaryData}
               disabled={isLoading}
@@ -593,7 +795,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
             {canManageCatalog && (
               <button
                 onClick={handleOpenCreateProduct}
-                className="h-10 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase flex items-center gap-2 shadow-lg transition-all"
+                className="h-10 px-4 bg-[#101b13] hover:bg-emerald-600 border border-emerald-500/30 hover:border-emerald-500 text-emerald-400 hover:text-white rounded-xl text-xs font-bold uppercase flex items-center gap-2 shadow-lg transition-all"
                 title="Añadir una nueva variedad al dispensario"
               >
                 <Plus size={16} /> Añadir Variedad
@@ -608,76 +810,113 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {products.map(prod => (
-              <div 
-                key={prod.id}
-                className="bg-[#080d0a] border border-[#1a2a1e] hover:border-emerald-500/40 rounded-2xl p-4.5 flex flex-col justify-between transition-all space-y-3"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <span 
-                      className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${
-                        prod.category === 'SATIVA' ? 'bg-amber-500/10 text-amber-400 border-amber-500/25' :
-                        prod.category === 'INDICA' ? 'bg-purple-500/10 text-purple-400 border-purple-500/25' :
-                        prod.category === 'EXTRACCIÓN' ? 'bg-rose-500/10 text-rose-400 border-rose-500/25' :
-                        'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                      }`}
-                      title={`Tipo de genética: ${prod.category}`}
-                    >
-                      {prod.category}
-                    </span>
+            {products.map(prod => {
+              const isSelectedForBatch = selectedBatchProductIds.includes(prod.id);
 
-                    <div className="flex items-center gap-1">
-                      {canManageCatalog && (
-                        <button 
-                          onClick={() => handleOpenEditProduct(prod)}
-                          className="p-1 text-gray-400 hover:text-emerald-400 transition-colors"
-                          title="Editar precio, stock o información de la variedad"
+              return (
+                <div 
+                  key={prod.id}
+                  className={`border rounded-2xl p-4.5 flex flex-col justify-between transition-all space-y-3 relative ${
+                    isSelectedForBatch 
+                      ? 'bg-[#0f1d14] border-emerald-500 shadow-lg ring-1 ring-emerald-500/50' 
+                      : 'bg-[#080d0a] border-[#1a2a1e] hover:border-emerald-500/40'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {/* Selector de selección múltiple */}
+                        {canDispense && (
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectBatchProduct(prod.id)}
+                            className="p-1 text-gray-400 hover:text-emerald-400 transition-colors"
+                            title={isSelectedForBatch ? "Quitar de la selección múltiple" : "Añadir a la dispensación múltiple"}
+                          >
+                            {isSelectedForBatch ? <CheckSquare size={16} className="text-emerald-400" /> : <Square size={16} className="text-gray-600" />}
+                          </button>
+                        )}
+
+                        <span 
+                          className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${
+                            prod.category === 'SATIVA' ? 'bg-amber-500/10 text-amber-400 border-amber-500/25' :
+                            prod.category === 'INDICA' ? 'bg-purple-500/10 text-purple-400 border-purple-500/25' :
+                            prod.category === 'EXTRACCIÓN' ? 'bg-rose-500/10 text-rose-400 border-rose-500/25' :
+                            'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                          }`}
+                          title={`Tipo de genética: ${prod.category}`}
                         >
-                          <Edit3 size={13} />
-                        </button>
-                      )}
-                      {isAdmin && (
-                        <button 
-                          onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                          className="p-1 text-gray-400 hover:text-rose-400 transition-colors"
-                          title="Eliminar variedad permanentemente del catálogo"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
+                          {prod.category}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        {canManageCatalog && (
+                          <button 
+                            onClick={() => handleOpenEditProduct(prod)}
+                            className="p-1 text-gray-400 hover:text-emerald-400 transition-colors"
+                            title="Editar precio, stock o información de la variedad"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button 
+                            onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                            className="p-1 text-gray-400 hover:text-rose-400 transition-colors"
+                            title="Eliminar variedad permanentemente del catálogo"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    <h4 className="text-sm font-bold text-white mt-2.5 truncate" title={prod.name}>{prod.name}</h4>
+                    <p className="text-[10px] font-mono text-gray-400 mt-0.5" title="Concentración estimada">{prod.thcCbd || 'THC: Estándar'}</p>
                   </div>
 
-                  <h4 className="text-sm font-bold text-white mt-2.5 truncate" title={prod.name}>{prod.name}</h4>
-                  <p className="text-[10px] font-mono text-gray-400 mt-0.5" title="Concentración estimada">{prod.thcCbd || 'THC: Estándar'}</p>
+                  <div className="pt-3 border-t border-[#1a2a1e] space-y-2.5">
+                    <div className="flex justify-between items-baseline text-xs">
+                      <span className="text-[10px] font-mono text-gray-500 uppercase">Aporte / Gramo:</span>
+                      <span className="font-mono font-black text-emerald-400 text-sm" title="Aporte fijado por gramo">{prod.pricePerGram.toFixed(2)} €</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[11px] font-mono">
+                      <span className="text-gray-500">Stock:</span>
+                      <span className={`font-bold ${prod.stockGrams < 20 ? 'text-rose-400 animate-pulse' : 'text-gray-300'}`} title="Stock restante en almacén">
+                        {prod.stockGrams.toFixed(2)} g
+                      </span>
+                    </div>
+
+                    {canDispense && (
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <button
+                          onClick={() => handleOpenDispense(prod)}
+                          className="flex-1 h-8 bg-emerald-600/15 hover:bg-emerald-600 border border-emerald-500/30 hover:border-emerald-500 text-emerald-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                          title="Dispensar solo esta variedad"
+                        >
+                          <Scale size={13} /> Dispensar
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleSelectBatchProduct(prod.id)}
+                          className={`h-8 px-2.5 rounded-xl border text-xs font-mono font-bold transition-all flex items-center gap-1 ${
+                            isSelectedForBatch 
+                              ? 'bg-emerald-600 border-emerald-500 text-white' 
+                              : 'bg-[#080d0a] border-[#1a2a1e] text-gray-400 hover:text-white'
+                          }`}
+                          title={isSelectedForBatch ? "Desmarcar para lote" : "Marcar para dispensación múltiple"}
+                        >
+                          {isSelectedForBatch ? '✓ En lote' : '+ Lote'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-
-                <div className="pt-3 border-t border-[#1a2a1e] space-y-2.5">
-                  <div className="flex justify-between items-baseline text-xs">
-                    <span className="text-[10px] font-mono text-gray-500 uppercase">Aporte / Gramo:</span>
-                    <span className="font-mono font-black text-emerald-400 text-sm" title="Aporte fijado por gramo">{prod.pricePerGram.toFixed(2)} €</span>
-                  </div>
-
-                  <div className="flex justify-between items-center text-[11px] font-mono">
-                    <span className="text-gray-500">Stock:</span>
-                    <span className={`font-bold ${prod.stockGrams < 20 ? 'text-rose-400 animate-pulse' : 'text-gray-300'}`} title="Stock restante en almacén">
-                      {prod.stockGrams.toFixed(2)} g
-                    </span>
-                  </div>
-
-                  {canDispense && (
-                    <button
-                      onClick={() => handleOpenDispense(prod)}
-                      className="w-full h-8 bg-emerald-600/15 hover:bg-emerald-600 border border-emerald-500/30 hover:border-emerald-500 text-emerald-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
-                      title="Registrar cierre o dispensación de esta variedad"
-                    >
-                      <Scale size={13} /> Dispensar Jornada
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -887,7 +1126,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
           )}
         </div>
 
-        {/* Bitácora de Cierres de Jornada con Peso Real */}
+        {/* Bitácora de Cierres de Jornada */}
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider font-mono">
@@ -966,7 +1205,249 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
         </div>
       </div>
 
-      {/* 4. MODAL CREAR / EDITAR VARIEDAD */}
+      {/* ======================================================== */}
+      {/* 4. MODAL DISPENSACIÓN MÚLTIPLE EN LOTE (BATCH DISPENSE) */}
+      {/* ======================================================== */}
+      {isBatchDispenseModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-5 sm:p-7 max-w-3xl w-full relative space-y-4 shadow-2xl max-h-[92vh] flex flex-col">
+            <button 
+              type="button"
+              onClick={() => setIsBatchDispenseModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              title="Cerrar ventana"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1a2a1e] pb-3 gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0">
+                  <Layers size={22} />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wide">
+                    Dispensación Conjunta ({batchItems.length} Variedades)
+                  </h3>
+                  <span className="text-[10px] font-mono text-gray-400">
+                    Ajusta gramos, euros y peso real en báscula por cada producto
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBatchDispenseDate(new Date().toISOString().split('T')[0])}
+                  className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/30 flex items-center gap-1 transition-all"
+                  title="Establecer fecha de hoy"
+                >
+                  <Calendar size={11} /> Hoy
+                </button>
+                <input
+                  type="date"
+                  required
+                  value={batchDispenseDate}
+                  onChange={e => setBatchDispenseDate(e.target.value)}
+                  className="h-8 px-2 bg-[#080d0a] border border-[#1a2a1e] rounded-lg text-white font-mono text-xs font-bold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            {/* Listado dinámico de variedades seleccionadas */}
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[50vh]">
+              {batchItems.map((item, index) => {
+                const gNum = parseDecimalInput(item.grams);
+                const prNum = parseDecimalInput(item.pesoReal);
+                const maxExtra = gNum < 5 ? 0.09 : 1.0;
+                const maxAllowedPr = Number((gNum + maxExtra).toFixed(2));
+                const extra = Number((prNum - gNum).toFixed(2));
+                const isItemExceeded = extra > maxExtra + 0.0001;
+
+                return (
+                  <div 
+                    key={item.product.id}
+                    className={`p-3.5 rounded-2xl border transition-all space-y-2.5 ${
+                      isItemExceeded 
+                        ? 'bg-rose-950/20 border-rose-500/50' 
+                        : 'bg-[#080d0a] border-[#1a2a1e]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-[#1a2a1e]/60 pb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-bold text-white truncate">
+                          {item.product.name}
+                        </span>
+                        <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-1.5 py-0.2 rounded font-bold uppercase shrink-0">
+                          {item.product.category}
+                        </span>
+                        <span className="text-[10px] font-mono text-gray-400 shrink-0">
+                          {item.product.pricePerGram.toFixed(2)} €/g
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-mono text-gray-500">
+                          Stock: {item.product.stockGrams.toFixed(2)}g
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBatchItem(index)}
+                          className="p-1 text-gray-500 hover:text-rose-400 rounded transition-colors"
+                          title="Quitar esta variedad de la lista"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                      {/* Gramos Cobrados */}
+                      <div>
+                        <label className="block text-[9px] font-mono text-gray-400 uppercase font-bold mb-1">
+                          Gramos Cobrados *
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          required
+                          value={item.grams}
+                          onChange={e => handleBatchItemGramsChange(index, e.target.value)}
+                          placeholder="0.00"
+                          className="w-full h-9 px-2.5 bg-[#0e1711] border border-[#1a2a1e] rounded-xl text-white font-mono font-bold text-xs focus:outline-none focus:border-emerald-500"
+                          title="Gramos facturados"
+                        />
+                      </div>
+
+                      {/* Euros Producidos */}
+                      <div>
+                        <label className="block text-[9px] font-mono text-gray-400 uppercase font-bold mb-1">
+                          Euros Producidos (€) *
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            required
+                            value={item.euros}
+                            onChange={e => handleBatchItemEurosChange(index, e.target.value)}
+                            placeholder="0.00"
+                            className="w-full h-9 px-2.5 pr-6 bg-[#0e1711] border border-[#1a2a1e] rounded-xl text-emerald-400 font-mono font-bold text-xs focus:outline-none focus:border-emerald-500"
+                            title="Aporte en euros"
+                          />
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 font-mono font-bold text-[10px] text-emerald-500">
+                            €
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Peso Real Báscula */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-[9px] font-mono text-amber-400 uppercase font-bold">
+                            Peso Real Báscula *
+                          </label>
+                          <span className="text-[8px] font-mono text-gray-500">
+                            Máx: {maxAllowedPr.toFixed(2)}g
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            required
+                            value={item.pesoReal}
+                            onChange={e => handleBatchItemRealWeightChange(index, e.target.value)}
+                            placeholder="0.00"
+                            className={`w-full h-9 px-2.5 pr-6 bg-[#0e1711] border rounded-xl font-mono font-bold text-xs focus:outline-none ${
+                              isItemExceeded 
+                                ? 'border-rose-500 text-rose-400 ring-1 ring-rose-500/50' 
+                                : 'border-amber-500/30 text-amber-300 focus:border-amber-400'
+                            }`}
+                            title="Gramos físicos reales que salieron del stock"
+                          />
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 font-mono font-bold text-[10px] text-amber-500">
+                            g
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Feedback de cortesía por fila */}
+                    {isItemExceeded ? (
+                      <p className="text-[9px] font-mono text-rose-400 flex items-center gap-1">
+                        <AlertTriangle size={11} className="shrink-0" />
+                        Límite superado: Máximo +{maxExtra.toFixed(2)}g de cortesía (tope: {maxAllowedPr.toFixed(2)}g).
+                      </p>
+                    ) : extra > 0 ? (
+                      <p className="text-[9px] font-mono text-emerald-400 flex items-center gap-1">
+                        <Check size={11} /> Cortesía aplicada: +{extra.toFixed(2)}g (Permitido hasta +{maxExtra.toFixed(2)}g).
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Cuadro Resumen Acumulado del Lote */}
+            <div className="p-3.5 bg-[#080d0a] rounded-2xl border border-[#1a2a1e] grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+              <div>
+                <span className="text-[9px] text-gray-500 uppercase font-bold block">Gramos Cobrados:</span>
+                <span className="text-base font-black text-white">{batchTotalGrams.toFixed(2)} g</span>
+              </div>
+              <div>
+                <span className="text-[9px] text-amber-400 uppercase font-bold block">Peso Real Báscula:</span>
+                <span className="text-base font-black text-amber-300">{batchTotalPesoReal.toFixed(2)} g</span>
+              </div>
+              <div>
+                <span className="text-[9px] text-emerald-400 uppercase font-bold block">Aporte Total (€):</span>
+                <span className="text-base font-black text-emerald-400">{batchTotalEuros.toFixed(2)} €</span>
+              </div>
+              <div>
+                <span className="text-[9px] text-gray-400 uppercase font-bold block">Cortesía Total:</span>
+                <span className={`text-base font-black ${batchTotalCourtesy > 0 ? 'text-emerald-400' : 'text-gray-400'}`}>
+                  +{Math.max(0, batchTotalCourtesy).toFixed(2)} g
+                </span>
+              </div>
+            </div>
+
+            {hasBatchErrors && (
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+                <AlertTriangle size={15} className="shrink-0" />
+                <span>Revisa las variedades marcadas en rojo: superan el límite de cortesía (+0.09g para menos de 5g | +1.0g para 5g o más).</span>
+              </div>
+            )}
+
+            {/* Botones de acción */}
+            <div className="pt-2 flex items-center justify-end gap-3 border-t border-[#1a2a1e]">
+              <button
+                type="button"
+                onClick={() => setIsBatchDispenseModalOpen(false)}
+                className="h-10 px-4 bg-[#080d0a] hover:bg-[#1a2a1e] border border-[#1a2a1e] text-gray-400 hover:text-white rounded-xl text-xs font-bold uppercase transition-all"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={hasBatchErrors || batchItems.length === 0 || isSubmittingBatch}
+                onClick={handleConfirmBatchDispense}
+                className={`h-10 px-6 rounded-xl text-xs font-bold uppercase shadow-lg flex items-center gap-2 transition-all ${
+                  hasBatchErrors || batchItems.length === 0 || isSubmittingBatch
+                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed border border-[#1a2a1e]'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-98'
+                }`}
+                title={hasBatchErrors ? "Corrige los pesos que exceden el límite" : "Confirmar y dispensar todas las variedades"}
+              >
+                {isSubmittingBatch ? <RefreshCw size={14} className="animate-spin" /> : <Check size={16} />}
+                <span>{isSubmittingBatch ? 'Procesando Lote...' : `Confirmar Dispensación Múltiple (${batchItems.length})`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. MODAL CREAR / EDITAR VARIEDAD */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-6 max-w-md w-full relative space-y-4 shadow-2xl">
@@ -1072,7 +1553,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
         </div>
       )}
 
-      {/* 5. MODAL DISPENSAR JORNADA CON LIMITACIÓN DE CORTESÍA / PESO REAL */}
+      {/* 6. MODAL DISPENSAR JORNADA INDIVIDUAL */}
       {isDispenseModalOpen && selectedProductToDispense && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-6 sm:p-7 max-w-md w-full relative space-y-4 shadow-2xl overflow-hidden">
@@ -1124,7 +1605,6 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
                 />
               </div>
 
-              {/* 1. Gramos Dispensados en el Día */}
               <div>
                 <label className="block text-[10px] font-mono text-gray-400 uppercase font-bold mb-1">
                   Gramos Dispensados en el Día *
@@ -1156,7 +1636,6 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
                 </div>
               </div>
 
-              {/* 2. Euros Producidos (€) */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[10px] font-mono text-gray-400 uppercase font-bold flex items-center gap-1">
@@ -1184,7 +1663,6 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
                 </div>
               </div>
 
-              {/* 3. Peso Real (Báscula) con Límite de Cortesía */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[10px] font-mono text-amber-400 uppercase font-bold flex items-center gap-1">
@@ -1233,7 +1711,6 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
                 )}
               </div>
 
-              {/* Resumen */}
               <div className="p-3 bg-[#080d0a] rounded-xl border border-[#1a2a1e] space-y-1.5 text-xs font-mono">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 font-bold uppercase text-[10px]">Aporte Económico:</span>
@@ -1273,7 +1750,7 @@ export default function DashboardStats({ members, currentWorker }: DashboardStat
         </div>
       )}
 
-      {/* 6. MODAL EDITAR DISPENSACIÓN */}
+      {/* 7. MODAL EDITAR DISPENSACIÓN */}
       {isEditDispenseModalOpen && editingDispense && canModifyDispensation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#0e1711] border border-[#1a2a1e] rounded-3xl p-6 max-w-md w-full relative space-y-4 shadow-2xl">
